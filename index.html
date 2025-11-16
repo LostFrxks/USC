@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>USC Front MVP</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="/media/logo_usc-round-corners.png" type="image/x-icon">
+</head>
+<body>
+  <div class="app">
+    <div class="overlay"></div>
+
+    <aside class="drawer">
+      <div class="drawer-header">
+        <div class="drawer-avatar">
+          <img src="media/ava_burger.svg" alt="Профиль" id="drawer-avatar">
+        </div>
+        <button class="drawer-close">×</button>
+      </div>
+
+      <div class="drawer-rating">
+        <div class="stars">
+          <img src="media/star.svg" alt="" class="star filled">
+          <img src="media/star.svg" alt="" class="star filled">
+          <img src="media/star.svg" alt="" class="star filled">
+          <img src="media/star.svg" alt="" class="star filled">
+          <img src="media/star_none.svg" alt="" class="star">
+        </div>
+        <div class="drawer-rating-text" id="drawer-rating-text">
+          4.0 · 85 отзывов
+        </div>
+      </div>
+
+      <nav class="drawer-menu">
+        <button class="drawer-link" data-screen="publications">
+          <img src="media/your_publish.png" alt="">
+          <span>Ваши публикации</span>
+        </button>
+
+        <button class="drawer-link" data-screen="profile-edit">
+          <img src="media/ava_burger1.svg" alt="">
+          <span>Редактирование профиля</span>
+        </button>
+
+        <button class="drawer-link" data-screen="orders">
+          <img src="media/history.png" alt="">
+          <span>История заказов</span>
+        </button>
+
+        <button class="drawer-link" data-screen="notifications">
+          <img src="media/notifications.png" alt="">
+          <span>Уведомления</span>
+        </button>
+
+        <button class="drawer-link" data-screen="about">
+          <img src="media/phone.png" alt="">
+          <span>О приложении</span>
+        </button>
+
+        <button class="drawer-link" data-screen="help">
+          <img src="media/headphones.png" alt="">
+          <span>Помощь</span>
+        </button>
+
+        <button class="drawer-link" data-screen="faq">
+          <img src="media/questions.png" alt="">
+          <span>Частые вопросы</span>
+        </button>
+      </nav>
+    </aside>
+
+    <main class="screens">
+      <!-- HOME -->
+      <section id="screen-home" class="screen active">
+        <header class="topbar">
+          <button class="burger">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <div class="address">
+            Улица Медерова, 161а
+            <span class="address-arrow">▼</span>
+          </div>
+          <button class="icon-button">
+            <img src="media/notifications.png" alt="Уведомления">
+          </button>
+        </header>
+
+        <div class="home-card">
+          <div class="logo-row">
+            <img src="media/usc.svg" alt="USC" class="logo">
+          </div>
+
+          <div class="categories">
+            <button class="category category-search">
+              <img src="media/search.svg" alt="Поиск" style="width: 40px; height: 40px; border-radius: 999px;">
+            </button>
+
+            <button class="category active" data-category="meat">
+              <img src="media/meat.svg" alt="Мясо" style="width: 58px; height: 40px;">
+            </button>
+            <button class="category" data-category="milk">
+              <img src="media/milk.svg" alt="Молоко" style="width: 35px; height: 50px;">
+            </button>
+            <button class="category" data-category="fish">
+              <img src="media/fish.svg" alt="Рыба" style="width: 55.2px; height: 35px;">
+            </button>
+            <button class="category" data-category="fruit" style="display: flex; padding-bottom: 10px; width: 40px;">
+              <img src="media/apple_car.svg" alt="Овощи и фрукты" style="width: 62.1px; height: 45px;">
+            </button>
+            <button class="category" data-category="bread">
+              <img src="media/bread.svg" alt="Хлеб" style="width: 62.1px; height: 45px;">
+            </button>
+            <button class="category" data-category="grain">
+              <img src="media/fish.svg" alt="Крупы" style="width: 55.2px; height: 35px;">
+            </button>
+          </div>
+
+          <div class="premium-banner">
+            <div class="premium-label">Премиум</div>
+          </div>
+
+          <div class="product-grid" id="product-grid"></div>
+        </div>
+      </section>
+
+      <!-- SEARCH -->
+      <section id="screen-search" class="screen">
+        <header class="simple-header">
+          <div class="simple-title">Поиск</div>
+        </header>
+
+        <div class="search-box">
+          <button class="icon-button">
+            <img src="media/search.png" alt="Поиск">
+          </button>
+          <input type="text" id="search-input" placeholder="Искать">
+          <button class="clear-search">×</button>
+        </div>
+
+        <ul class="search-list" id="search-list">
+          <li>Мясная продукция</li>
+          <li>Молочная продукция</li>
+          <li>Морепродукты</li>
+          <li>Овощи и фрукты</li>
+          <li>Хлеб и выпечка</li>
+        </ul>
+      </section>
+
+      <!-- CART -->
+      <section id="screen-cart" class="screen">
+        <header class="simple-header">
+          <div class="simple-title">Корзина</div>
+        </header>
+
+        <div class="cart-content">
+          <div class="cart-empty hidden" id="cart-empty">
+            <div class="cart-empty-icon">🧺</div>
+            <div class="cart-empty-title">В корзине пока пусто</div>
+            <div class="cart-empty-text">
+              Добавьте продукты с главной страницы USC и мы соберём ваш первый заказ.
+            </div>
+            <button class="primary-button cart-empty-button">
+              Перейти к товарам
+            </button>
+          </div>
+
+          <div class="cart-items" id="cart-items"></div>
+
+          <div class="cart-summary hidden" id="cart-summary">
+            <div class="cart-total-row">
+              <span>Итого</span>
+              <span id="cart-total">0 сом</span>
+            </div>
+            <button class="primary-button cart-checkout">
+              Оформить заказ
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PROFILE MAIN -->
+      <section id="screen-profile" class="screen">
+        <header class="simple-header">
+          <div class="simple-title">Профиль продавца</div>
+        </header>
+
+        <div class="profile-header">
+          <div class="profile-avatar">
+            <img src="media/ava_burger.svg" alt="Профиль" id="profile-avatar">
+          </div>
+          <div class="profile-info">
+            <div class="profile-name" id="profile-name">USC Premium Seller</div>
+            <div class="profile-email" id="profile-email">seller@usc.market</div>
+            <div class="stars profile-stars" style="gap:5px">
+                <img src="media/star.svg" alt="" class="profile-star star ">
+                <img src="media/star.svg" alt="" class="profile-star star  ">
+                <img src="media/star.svg" alt="" class="profile-star star  ">
+                <img src="media/star.svg" alt="" class="profile-star star  ">
+                <img src="media/star_none.svg" alt="" class="star profile-star">
+            </div>
+            <div class="profile-rating-text" id="profile-rating-text">
+              4.2 · 120 отзывов
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-stats">
+          <div class="stat-card">
+            <div class="stat-label">Заказы за месяц</div>
+            <div class="stat-value">48</div>
+            <div class="stat-bar">
+              <div class="stat-bar-fill" style="width: 70%"></div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Повторные клиенты</div>
+            <div class="stat-value">62%</div>
+            <div class="stat-bar">
+              <div class="stat-bar-fill" style="width: 62%"></div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Средний рейтинг</div>
+            <div class="stat-value">4.2</div>
+            <div class="stat-bar">
+              <div class="stat-bar-fill" style="width: 84%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-section">
+          <div class="profile-section-title">Контакты</div>
+          <div class="profile-row">
+            <span>Email</span>
+            <span id="profile-email-row">seller@usc.market</span>
+          </div>
+          <div class="profile-row">
+            <span>Телефон</span>
+            <span id="profile-phone-row">+996 500 000 000</span>
+          </div>
+          <div class="profile-row">
+            <span>Адрес склада</span>
+            <span id="profile-address-row">Бишкек, Медерова 161а</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- PUBLICATIONS -->
+      <section id="screen-publications" class="screen">
+        <header class="topbar topbar-secondary">
+          <button class="burger">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <div class="address">
+            Улица Медерова, 161а
+            <span class="address-arrow">▼</span>
+          </div>
+          <button class="icon-button">
+            <img src="media/notifications.png" alt="Уведомления">
+          </button>
+        </header>
+
+        <header class="simple-header">
+          <div class="simple-title">Ваши публикации</div>
+        </header>
+
+        <div class="publications-grid">
+          <article class="publication-card">
+            <img src="media/card_meat1.jpg" alt="" class="publication-image">
+            <div class="publication-body">
+              <div class="publication-title">Мраморная говядина · опт от 20 кг</div>
+              <div class="publication-meta">Активно · 4.9 ★ · 85 оценок</div>
+            </div>
+          </article>
+          <article class="publication-card">
+            <img src="media/card_fish2.jpg" alt="" class="publication-image">
+            <div class="publication-body">
+              <div class="publication-title">Лосось охлаждённый для ресторанов</div>
+              <div class="publication-meta">Черновик · обновлено вчера</div>
+            </div>
+          </article>
+          <article class="publication-card">
+            <img src="media/card_bread3.jpg" alt="" class="publication-image">
+            <div class="publication-body">
+              <div class="publication-title">Хлеб и выпечка для кофеен</div>
+              <div class="publication-meta">Архив · 2024</div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- PROFILE EDIT -->
+      <section id="screen-profile-edit" class="screen">
+        <header class="topbar topbar-secondary">
+          <button class="burger">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <div class="address">
+            Улица Медерова, 161а
+            <span class="address-arrow">▼</span>
+          </div>
+          <button class="icon-button">
+            <img src="media/notifications.png" alt="Уведомления">
+          </button>
+        </header>
+
+        <header class="simple-header">
+          <div class="simple-title">Редактирование профиля</div>
+        </header>
+
+        <form class="profile-edit-form" id="profile-edit-form">
+          <label class="profile-edit-field">
+            <span>Название аккаунта</span>
+            <input type="text" id="edit-name" value="USC Premium Seller">
+          </label>
+          <label class="profile-edit-field">
+            <span>Email</span>
+            <input type="email" id="edit-email" value="seller@usc.market">
+          </label>
+          <label class="profile-edit-field">
+            <span>Телефон</span>
+            <input type="text" id="edit-phone" value="+996 500 000 000">
+          </label>
+          <label class="profile-edit-field">
+            <span>Адрес склада</span>
+            <input type="text" id="edit-address" value="Бишкек, Медерова 161а">
+          </label>
+          <button class="primary-button profile-edit-submit" type="submit">
+            Сохранить изменения
+          </button>
+        </form>
+      </section>
+
+      <!-- ORDERS HISTORY -->
+      <section id="screen-orders" class="screen">
+        <header class="topbar topbar-secondary">
+          <button class="burger">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <div class="address">
+            Улица Медерова, 161а
+            <span class="address-arrow">▼</span>
+          </div>
+          <button class="icon-button">
+            <img src="media/notifications.png" alt="Уведомления">
+          </button>
+        </header>
+
+        <header class="simple-header">
+          <div class="simple-title">История заказов</div>
+        </header>
+
+        <div class="orders-list">
+          <div class="order-card">
+            <div class="order-row">
+              <span class="order-id">USC-1038</span>
+              <span class="order-status success">Доставлен</span>
+            </div>
+            <div class="order-row">
+              <span>Ресторан «Гурман»</span>
+              <span>24 500 сом</span>
+            </div>
+            <div class="order-meta">24 кг мяса · 12 ноября · Курьер USC</div>
+          </div>
+
+          <div class="order-card">
+            <div class="order-row">
+              <span class="order-id">USC-1027</span>
+              <span class="order-status progress">В пути</span>
+            </div>
+            <div class="order-row">
+              <span>Сеть кофеен «City Coffee»</span>
+              <span>17 300 сом</span>
+            </div>
+            <div class="order-meta">хлеб, молоко, выпечка · 10 ноября</div>
+          </div>
+
+          <div class="order-card">
+            <div class="order-row">
+              <span class="order-id">USC-1019</span>
+              <span class="order-status canceled">Отменён</span>
+            </div>
+            <div class="order-row">
+              <span>Мини-маркет «24/7»</span>
+              <span>8 900 сом</span>
+            </div>
+            <div class="order-meta">заказ отменён покупателем · 8 ноября</div>
+          </div>
+
+          <div class="order-card">
+            <div class="order-row">
+                <span class="order-id">USC-1042</span>
+                <span class="order-status success">Доставлен</span>
+            </div>
+            <div class="order-row">
+                <span>Кафе «Уют»</span>
+                <span>12 700 сом</span>
+            </div>
+            <div class="order-meta">мясо, молоко, хлеб · 13 ноября · Оплата через USC</div>
+            </div>
+
+            <div class="order-card">
+            <div class="order-row">
+                <span class="order-id">USC-1051</span>
+                <span class="order-status progress">В пути</span>
+            </div>
+            <div class="order-row">
+                <span>Отель «Азия»</span>
+                <span>31 400 сом</span>
+            </div>
+            <div class="order-meta">овощи, фрукты, молочка · доставка сегодня до 20:00</div>
+            </div>
+
+            <div class="order-card">
+            <div class="order-row">
+                <span class="order-id">USC-0998</span>
+                <span class="order-status canceled">Отменён</span>
+            </div>
+            <div class="order-row">
+                <span>Магазин «Эконом»</span>
+                <span>5 300 сом</span>
+            </div>
+            <div class="order-meta">отмена из-за изменения графика поставки · 5 ноября</div>
+            </div>
+
+            <div class="order-card">
+            <div class="order-row">
+                <span class="order-id">USC-1060</span>
+                <span class="order-status success">Доставлен</span>
+            </div>
+            <div class="order-row">
+                <span>Супермаркет «Народный»</span>
+                <span>42 900 сом</span>
+            </div>
+            <div class="order-meta">заморозка и мясо · 14 ноября · подтверждено менеджером</div>
+            </div>
+
+        </div>
+      </section>
+
+      <!-- NOTIFICATIONS -->
+      <section id="screen-notifications" class="screen">
+        <header class="topbar topbar-secondary">
+          <button class="burger">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <div class="address">
+            Улица Медерова, 161а
+            <span class="address-arrow">▼</span>
+          </div>
+          <button class="icon-button">
+            <img src="media/notifications.png" alt="Уведомления">
+          </button>
+        </header>
+
+        <header class="simple-header">
+          <div class="simple-title">Уведомления</div>
+        </header>
+
+        <div class="notifications-list">
+          <div class="notification-item">
+            <div class="notification-dot"></div>
+            <div class="notification-content">
+              <div class="notification-title">
+                Новый заказ от ресторана «Гурман»
+              </div>
+              <div class="notification-text">
+                24 кг мясного сета, доставка сегодня до 18:00.
+              </div>
+              <div class="notification-meta">
+                Сегодня · 10:24
+              </div>
+            </div>
+          </div>
+
+          <div class="notification-item">
+            <div class="notification-dot dim"></div>
+            <div class="notification-content">
+              <div class="notification-title">
+                Оценка покупателя
+              </div>
+              <div class="notification-text">
+                Магазин «Fresh Market» поставил 5★ за последний заказ.
+              </div>
+              <div class="notification-meta">
+                Вчера · 19:40
+              </div>
+            </div>
+          </div>
+
+          <div class="notification-item">
+            <div class="notification-dot dim"></div>
+            <div class="notification-content">
+              <div class="notification-title">
+                Обновление статуса доставки
+              </div>
+              <div class="notification-text">
+                Заказ USC-1038 перешёл в статус «В пути».
+              </div>
+              <div class="notification-meta">
+                11 ноября · 15:12
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ABOUT APP -->
+      <section id="screen-about" class="screen">
+        <header class="topbar topbar-secondary">
+          <button class="burger">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <div class="address">
+            Улица Медерова, 161а
+            <span class="address-arrow">▼</span>
+          </div>
+          <button class="icon-button">
+            <img src="media/notifications.png" alt="Уведомления">
+          </button>
+        </header>
+
+        <header class="simple-header">
+          <div class="simple-title">О приложении</div>
+        </header>
+
+        <div class="about-card">
+          <div class="about-logo-row">
+            <img src="media/usc.svg" alt="USC" class="about-logo">
+          </div>
+          <div class="about-version">
+            USC · Unity Supply Chain · v0.1 MVP
+          </div>
+          <div class="about-text">
+            USC помогает бизнесам:
+          </div>
+          <ul class="about-list">
+            <li>находить надёжных поставщиков продуктов и сырья</li>
+            <li>отправлять заказы в пару кликов с телефона</li>
+            <li>контролировать оплату и доставку в одном месте</li>
+          </ul>
+          <div class="about-footnote">
+            Этот экран показывает нашу визуализацию продукта. Полная версия будет работать в мобильном приложении USC.
+          </div>
+        </div>
+      </section>
+
+      <!-- HELP / CHAT -->
+      <section id="screen-help" class="screen">
+        <header class="topbar topbar-secondary">
+          <button class="burger">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <div class="address">
+            Улица Медерова, 161а
+            <span class="address-arrow">▼</span>
+          </div>
+          <button class="icon-button">
+            <img src="media/notifications.png" alt="Уведомления">
+          </button>
+        </header>
+
+        <header class="simple-header">
+          <div class="simple-title">Помощь</div>
+        </header>
+
+        <div class="help-chat">
+          <div class="help-chat-window" id="help-chat-window"></div>
+
+          <form class="help-chat-input" id="help-chat-form">
+            <input
+              id="help-chat-input"
+              type="text"
+              placeholder="Напишите вопрос по работе USC"
+              autocomplete="off"
+            >
+            <button class="primary-button help-chat-send" type="submit">
+              Отправить
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section id="screen-faq" class="screen">
+        <header class="topbar topbar-secondary">
+          <button class="burger">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <div class="address">
+            Улица Медерова, 161а
+            <span class="address-arrow">▼</span>
+          </div>
+          <button class="icon-button">
+            <img src="media/notifications.png" alt="Уведомления">
+          </button>
+        </header>
+
+        <header class="simple-header">
+          <div class="simple-title">Частые вопросы</div>
+        </header>
+
+        <div class="faq-list">
+          <div class="faq-item">
+            <button class="faq-question">
+              Как работает оплата через USC?
+            </button>
+            <div class="faq-answer">
+              Заказ фиксируется в системе, клиент оплачивает через партнёров USC,
+              деньги блокируются на счёте и перечисляются поставщику только после
+              подтверждения доставки.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question">
+              Кто может размещать товары в USC?
+            </button>
+            <div class="faq-answer">
+              Фермеры, оптовые поставщики, производители продуктов и упаковки,
+              которые прошли проверку команды USC и подтвердили качество поставок.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question">
+              Можно работать только с одним поставщиком?
+            </button>
+            <div class="faq-answer">
+              Да, можно. Но сила USC в том, что вы видите сразу несколько
+              предложений по цене, качеству и условиям доставки в одном интерфейсе
+              и выбираете лучшее.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button class="faq-question">
+              Нужно ли что-то устанавливать для покупателей?
+            </button>
+            <div class="faq-answer">
+              Для покупателей будет мобильное приложение USC.
+              Сейчас в этом MVP мы показываем сторону поставщика и то,
+              как он управляет своими заказами.
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+
+        <nav class="tabbar">
+      <button class="tab active" data-screen="home">
+        <img src="media/home.png" alt="" class="tab-icon">
+        <span>Главная</span>
+      </button>
+      <button class="tab" data-screen="search">
+        <img src="media/search1.svg" alt="" class="tab-icon">
+        <span>Поиск</span>
+      </button>
+      <button class="tab" data-screen="cart">
+        <img src="media/basket.svg" alt="" class="tab-icon">
+        <span>Корзина</span>
+        <span class="tab-badge" id="cart-badge">0</span>
+      </button>
+      <button class="tab" data-screen="profile">
+        <img src="media/ava.svg" alt="" class="tab-icon">
+        <span>Профиль</span>
+      </button>
+    </nav>
+
+    <!-- Модалка оформления заказа -->
+    <div class="modal-overlay" id="order-modal">
+      <div class="modal">
+        <div class="modal-spinner" id="order-modal-spinner"></div>
+        <div class="modal-title" id="order-modal-title">Обработка заказа...</div>
+        <div class="modal-text" id="order-modal-text">
+          Мы проверяем товары и формируем заказ
+        </div>
+        <button
+          class="primary-button modal-close hidden"
+          type="button"
+          id="order-modal-close"
+        >
+          Понятно
+        </button>
+      </div>
+    </div>
+
+    <!-- Модалка "Оцените нас" -->
+    <div class="modal-overlay" id="feedback-modal">
+      <div class="modal feedback-modal">
+        <div class="modal-title">Оцените дизайн USC</div>
+        <div class="modal-text feedback-modal-subtitle">
+          Нам важно ваше мнение. Это поможет нам сделать приложение удобнее.
+        </div>
+
+        <div class="feedback-stars" id="feedback-stars">
+          <button type="button" class="feedback-star" data-value="1">★</button>
+          <button type="button" class="feedback-star" data-value="2">★</button>
+          <button type="button" class="feedback-star" data-value="3">★</button>
+          <button type="button" class="feedback-star" data-value="4">★</button>
+          <button type="button" class="feedback-star" data-value="5">★</button>
+        </div>
+
+        <form class="feedback-form" id="feedback-form">
+          <label class="feedback-field">
+            <span>Что вам понравилось</span>
+            <textarea id="feedback-like" rows="2"
+              placeholder="Например: удобный дизайн, понятная корзина"></textarea>
+          </label>
+
+          <label class="feedback-field">
+            <span>Чего не хватало</span>
+            <textarea id="feedback-miss" rows="2"
+              placeholder="Например: фильтры, поиск по поставщикам"></textarea>
+          </label>
+
+          <label class="feedback-field">
+            <span>Идеи по улучшению</span>
+            <textarea id="feedback-ideas" rows="2"
+              placeholder="Например: карта курьеров, аналитика продаж"></textarea>
+          </label>
+
+          <button class="primary-button feedback-submit" type="submit">
+            Отправить отзыв
+          </button>
+          <button class="feedback-cancel" type="button" id="feedback-cancel">
+            Закрыть без отправки
+          </button>
+
+          <div class="feedback-note">
+            Сейчас мы сохраняем отзыв только на этом экране.
+            В финальной версии USC он будет отправляться на сервер.
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Одна (одна!) плавающая кнопка "Оцени нас" -->
+    <div class="feedback-floating" id="feedback-floating">
+      <div class="feedback-bubble" id="feedback-bubble">
+        Оцени наш сайт
+      </div>
+      <button class="feedback-button" id="feedback-button" type="button">
+        ★
+      </button>
+    </div>
+
+    <div class="toast" id="toast">Добавлено в корзину</div>
+  </div> <!-- /.app -->
+
+  <script src="app.js"></script>
+</body>
+</html>
