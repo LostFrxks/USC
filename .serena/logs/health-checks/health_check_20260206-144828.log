@@ -1,0 +1,20 @@
+INFO  2026-02-06 14:48:28,819 serena.cli:health_check:761 - Starting health check for project: C:\Users\asus\Desktop\TSI AUCA\fip17\USC
+INFO  2026-02-06 14:48:28,819 serena.cli:health_check:765 - Creating SerenaAgent with disabled dashboard...
+INFO  2026-02-06 14:48:28,819 serena.config.serena_config:from_config_file:574 - Loading Serena configuration from C:\Users\asus\.serena\serena_config.yml
+INFO  2026-02-06 14:48:28,820 serena.util.file_system:_load_gitignore_files:152 - Processing .gitignore file: C:\Users\asus\Desktop\TSI AUCA\fip17\USC\frontend\.gitignore
+WARNING 2026-02-06 14:48:28,843 serena.config.serena_config:from_config_file:602 - Project path C:\Users\asus\Desktop\Работа\MBank\bridge_module\RecSys_foudation_docs_md does not exist or does not contain a project configuration file, skipping.
+ERROR 2026-02-06 14:48:28,851 serena.cli:health_check:877 - Health check failed with exception: argument of type 'NoneType' is not iterable
+Traceback (most recent call last):
+  File "C:\Users\asus\AppData\Local\uv\cache\archive-v0\FDgfKW1DrpR11U1jOri5u\Lib\site-packages\serena\cli.py", line 766, in health_check
+    serena_config = SerenaConfig.from_config_file()
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\asus\AppData\Local\uv\cache\archive-v0\FDgfKW1DrpR11U1jOri5u\Lib\site-packages\serena\config\serena_config.py", line 609, in from_config_file
+    project_config = ProjectConfig.load(path)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\asus\AppData\Local\uv\cache\archive-v0\FDgfKW1DrpR11U1jOri5u\Lib\site-packages\serena\config\serena_config.py", line 365, in load
+    yaml_data, was_complete = cls._load_yaml(str(yaml_path))
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\asus\AppData\Local\uv\cache\archive-v0\FDgfKW1DrpR11U1jOri5u\Lib\site-packages\serena\config\serena_config.py", line 294, in _load_yaml
+    if key not in data:
+       ^^^^^^^^^^^^^^^
+TypeError: argument of type 'NoneType' is not iterable

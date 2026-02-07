@@ -1,0 +1,267 @@
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
+from sqlalchemy import String, cast, func, insert, or_, select, update, delete
+from sqlalchemy.orm import Session
+
+from app.deps.auth import get_current_user
+from app.db.deps import get_db
+from app.db.schema import catalog_category as categories
+from app.db.schema import catalog_product as products
+from app.db.schema import companies_company as companies
+from app.db.schema import companies_companymember as company_members
+from app.utils.pagination import drf_page
+
+router = APIRouter(tags=["products"])
+
+def _product_col(name: str):
+    c = products.c.get(name)
+    if c is None:
+        raise HTTPException(500, detail=f"DB schema mismatch: column '{products.name}.{name}' not found")
+    return c
+
+def _is_supplier_member(db: Session, user_id: int, company_id: int) -> bool:
+    row = db.execute(
+        select(company_members.c.id)
+        .select_from(company_members.join(companies, company_members.c.company_id == companies.c.id))
+        .where(
+            company_members.c.user_id == user_id,
+            company_members.c.company_id == company_id,
+            companies.c.company_type == "SUPPLIER",
+        )
+    ).first()
+    return row is not None
+
+def _product_with_names_query():
+    p = products
+    c = categories
+    co = companies
+    return (
+        select(
+            p,
+            co.c.name.label("supplier_name"),
+            c.c.name.label("category_name"),
+        )
+        .select_from(
+            p.outerjoin(co, p.c.supplier_company_id == co.c.id).outerjoin(c, p.c.category_id == c.c.id)
+        )
+    )
+
+class ProductCreatePayload(BaseModel):
+    supplier_company_id: int = Field(..., ge=1)
+    category_id: int | None = None
+    name: str = Field(min_length=1)
+    description: str | None = None
+    price: float = Field(..., gt=0)
+    unit: str | None = None
+    min_qty: float | None = None
+    in_stock: bool | None = None
+    track_inventory: bool | None = None
+    stock_qty: float | None = None
+
+class ProductUpdatePayload(BaseModel):
+    category_id: int | None = None
+    name: str | None = None
+    description: str | None = None
+    price: float | None = None
+    unit: str | None = None
+    min_qty: float | None = None
+    in_stock: bool | None = None
+    track_inventory: bool | None = None
+    stock_qty: float | None = None
+
+
+@router.get("/products/my_supplier_products/")
+def my_supplier_products(
+    company_id: int | None = None,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    u_id = int(user["id"])
+
+    supplier_ids: list[int] = []
+
+    if company_id is not None:
+        # verify membership and type=SUPPLIER
+        row = db.execute(
+            select(companies.c.id)
+            .select_from(company_members.join(companies, company_members.c.company_id == companies.c.id))
+            .where(
+                company_members.c.user_id == u_id,
+                company_members.c.company_id == company_id,
+                companies.c.company_type == "SUPPLIER",
+            )
+        ).first()
+        if not row:
+            raise HTTPException(403, detail="Not allowed")
+        supplier_ids = [int(company_id)]
+    else:
+        supplier_ids = [
+            int(r[0])
+            for r in db.execute(
+                select(company_members.c.company_id)
+                .select_from(company_members.join(companies, company_members.c.company_id == companies.c.id))
+                .where(company_members.c.user_id == u_id, companies.c.company_type == "SUPPLIER")
+            ).all()
+        ]
+
+    if not supplier_ids:
+        return []
+
+    q = _product_with_names_query().where(products.c.supplier_company_id.in_(supplier_ids)).order_by(products.c.id.desc())
+
+    rows = db.execute(q).mappings().all()
+    return [dict(r) for r in rows]
+
+
+@router.get("/products/")
+def list_products(
+    request: Request,
+    limit: int = 20,
+    offset: int = 0,
+    search: str | None = None,  # text search
+    category: str | None = None,  # id or name
+    supplier_company: int | None = None,  # supplier company id
+    in_stock: bool | None = None,
+    db: Session = Depends(get_db),
+):
+    p = products
+    c = categories
+    q = _product_with_names_query()
+
+    if supplier_company is not None:
+        q = q.where(p.c.supplier_company_id == supplier_company)
+
+    if in_stock is not None and "in_stock" in p.c:
+        q = q.where(p.c.in_stock == in_stock)
+
+    if category:
+        v = category.strip()
+        if v.isdigit():
+            q = q.where(p.c.category_id == int(v))
+        else:
+            q = q.where(func.lower(c.c.name) == v.lower())
+
+    if search:
+        s = f"%{search.strip()}%"
+        clauses = [cast(p.c.name, String).ilike(s)]
+        if "description" in p.c:
+            clauses.append(cast(p.c.description, String).ilike(s))
+        q = q.where(or_(*clauses))
+
+    total = db.execute(select(func.count()).select_from(q.subquery())).scalar_one()
+    rows = db.execute(q.order_by(p.c.id.desc()).limit(limit).offset(offset)).mappings().all()
+
+    # mappings() gives a flattened dict; good for frontend that expects raw DB-ish fields.
+    items = [dict(r) for r in rows]
+    return drf_page(items=items, total=total, limit=limit, offset=offset, path=str(request.url.path))
+
+@router.post("/products/")
+def create_product(
+    payload: ProductCreatePayload,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    u_id = int(user["id"])
+    if not _is_supplier_member(db, u_id, payload.supplier_company_id):
+        raise HTTPException(403, detail="Not allowed")
+
+    values: dict = {
+        "supplier_company_id": payload.supplier_company_id,
+        "name": payload.name.strip(),
+        "price": payload.price,
+    }
+    if payload.category_id is not None and "category_id" in products.c:
+        values["category_id"] = payload.category_id
+    # Provide safe defaults for NOT NULL columns even if DB defaults are absent.
+    if "description" in products.c:
+        values["description"] = payload.description if payload.description is not None else ""
+    if "unit" in products.c:
+        values["unit"] = payload.unit if payload.unit is not None else ""
+    if "min_qty" in products.c:
+        values["min_qty"] = payload.min_qty if payload.min_qty is not None else 1
+    if "in_stock" in products.c:
+        values["in_stock"] = payload.in_stock if payload.in_stock is not None else True
+    if "track_inventory" in products.c:
+        values["track_inventory"] = payload.track_inventory if payload.track_inventory is not None else False
+    if payload.stock_qty is not None and "stock_qty" in products.c:
+        values["stock_qty"] = payload.stock_qty
+    if "created_at" in products.c:
+        values["created_at"] = datetime.now(timezone.utc)
+
+    try:
+        ins = insert(products).values(values).returning(_product_col("id"))
+        prod_id = int(db.execute(ins).scalar_one())
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(400, detail=f"Product create failed. DB says: {e}")
+
+    row = db.execute(_product_with_names_query().where(products.c.id == prod_id)).mappings().first()
+    return dict(row) if row else {"id": prod_id, **values}
+
+@router.patch("/products/{product_id}/")
+def update_product(
+    product_id: int,
+    payload: ProductUpdatePayload,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    row = db.execute(select(products).where(products.c.id == product_id)).mappings().first()
+    if not row:
+        raise HTTPException(404, detail="Product not found")
+
+    supplier_company_id = int(row.get("supplier_company_id"))
+    if not _is_supplier_member(db, int(user["id"]), supplier_company_id):
+        raise HTTPException(403, detail="Not allowed")
+
+    values: dict = {}
+    if payload.category_id is not None and "category_id" in products.c:
+        values["category_id"] = payload.category_id
+    if payload.name is not None and "name" in products.c:
+        values["name"] = payload.name.strip()
+    if payload.description is not None and "description" in products.c:
+        values["description"] = payload.description
+    if payload.price is not None and "price" in products.c:
+        values["price"] = payload.price
+    if payload.unit is not None and "unit" in products.c:
+        values["unit"] = payload.unit
+    if payload.min_qty is not None and "min_qty" in products.c:
+        values["min_qty"] = payload.min_qty
+    if payload.in_stock is not None and "in_stock" in products.c:
+        values["in_stock"] = payload.in_stock
+    if payload.track_inventory is not None and "track_inventory" in products.c:
+        values["track_inventory"] = payload.track_inventory
+    if payload.stock_qty is not None and "stock_qty" in products.c:
+        values["stock_qty"] = payload.stock_qty
+
+    if values:
+        db.execute(update(products).where(products.c.id == product_id).values(values))
+        db.commit()
+
+    row = db.execute(_product_with_names_query().where(products.c.id == product_id)).mappings().first()
+    if not row:
+        raise HTTPException(404, detail="Product not found")
+    return dict(row)
+
+@router.delete("/products/{product_id}/", status_code=204)
+def delete_product(
+    product_id: int,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    row = db.execute(select(products).where(products.c.id == product_id)).mappings().first()
+    if not row:
+        raise HTTPException(404, detail="Product not found")
+    supplier_company_id = int(row.get("supplier_company_id"))
+    if not _is_supplier_member(db, int(user["id"]), supplier_company_id):
+        raise HTTPException(403, detail="Not allowed")
+
+    try:
+        db.execute(delete(products).where(products.c.id == product_id))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(400, detail=f"Product delete failed. DB says: {e}")
+    return None

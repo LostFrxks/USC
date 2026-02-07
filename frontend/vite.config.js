@@ -1,0 +1,24 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = dirname(__filename);
+export default defineConfig({
+    plugins: [react()],
+    server: {
+        proxy: {
+            // проксируем ТОЛЬКО API, НЕ /media
+            "/api": {
+                target: "http://127.0.0.1:8000",
+                changeOrigin: true,
+                secure: false,
+            },
+        },
+    },
+    resolve: {
+        alias: {
+            "@": resolve(__dirname, "src"),
+        },
+    },
+});
