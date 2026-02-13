@@ -407,5 +407,3 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
     </section>
   );
 }
-
-

@@ -1,0 +1,21 @@
+﻿services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: usc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: usc
+      POSTGRES_PASSWORD: usc123
+      POSTGRES_DB: usc_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - usc_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U usc -d usc_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  usc_pg_data:
