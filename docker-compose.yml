@@ -17,5 +17,21 @@
       timeout: 3s
       retries: 20
 
+  redis:
+    image: redis:7-alpine
+    container_name: usc-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - usc_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
 volumes:
   usc_pg_data:
+  usc_redis_data:

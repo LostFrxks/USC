@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+﻿from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, delete, func, insert, select, update
 from sqlalchemy.orm import Session
@@ -9,6 +9,8 @@ from app.db.deps import get_db
 from app.db.schema import companies_company as companies
 from app.db.schema import companies_companymember as company_members
 from app.utils.pagination import drf_page
+from app.core.config import settings
+from app.cache.redis_cache import get_json, invalidate_patterns, make_key, set_json
 
 router = APIRouter(tags=["companies"])
 
@@ -44,6 +46,17 @@ def _serialize_company(row: dict) -> dict:
         "created_at": row.get("created_at"),
     }
 
+
+
+def _invalidate_company_related_cache() -> None:
+    invalidate_patterns(
+        "v1:companies:*",
+        "v1:profile:*",
+        "v1:suppliers:*",
+        "v1:analytics:*",
+        "v1:notifications:*",
+    )
+
 class CompanyCreatePayload(BaseModel):
     name: str = Field(min_length=1)
     company_type: str | None = None
@@ -66,6 +79,12 @@ def list_companies(
     db: Session = Depends(get_db),
 ):
     u_id = int(user["id"])
+    term = (search or "").strip()
+    cache_key = make_key("companies", "list", u_id, limit, offset, term)
+    cached = get_json(cache_key)
+    if isinstance(cached, dict):
+        return cached
+
     base = (
         select(companies)
         .select_from(company_members.join(companies, company_members.c.company_id == companies.c.id))
@@ -73,13 +92,15 @@ def list_companies(
         .distinct()
     )
 
-    if search and "name" in companies.c:
-        base = base.where(companies.c.name.ilike(f"%{search.strip()}%"))
+    if term and "name" in companies.c:
+        base = base.where(companies.c.name.ilike(f"%{term}%"))
 
     total = db.execute(select(func.count()).select_from(base.subquery())).scalar_one()
     rows = db.execute(base.order_by(companies.c.id.desc()).limit(limit).offset(offset)).mappings().all()
     items = [_serialize_company(dict(r)) for r in rows]
-    return drf_page(items=items, total=total, limit=limit, offset=offset, path=str(request.url.path))
+    response = drf_page(items=items, total=total, limit=limit, offset=offset, path=str(request.url.path))
+    set_json(cache_key, response, settings.CACHE_TTL_COMPANIES)
+    return response
 
 @router.get("/companies/{company_id}/")
 def get_company(
@@ -121,6 +142,7 @@ def create_company(
             member_values["created_at"] = now
         db.execute(insert(company_members).values(member_values))
         db.commit()
+        _invalidate_company_related_cache()
     except Exception as e:
         db.rollback()
         raise HTTPException(400, detail=f"Company create failed. DB says: {e}")
@@ -149,6 +171,7 @@ def update_company(
     if values:
         db.execute(update(companies).where(companies.c.id == company_id).values(values))
         db.commit()
+        _invalidate_company_related_cache()
 
     row = db.execute(select(companies).where(companies.c.id == company_id)).mappings().first()
     if not row:
@@ -165,6 +188,7 @@ def delete_company(
     try:
         db.execute(delete(companies).where(companies.c.id == company_id))
         db.commit()
+        _invalidate_company_related_cache()
     except Exception as e:
         db.rollback()
         raise HTTPException(400, detail=f"Company delete failed. DB says: {e}")
@@ -173,6 +197,12 @@ def delete_company(
 
 @router.get("/companies/my_memberships/")
 def my_memberships(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    u_id = int(user["id"])
+    cache_key = make_key("companies", "memberships", u_id)
+    cached = get_json(cache_key)
+    if isinstance(cached, list):
+        return cached
+
     cols = [
         company_members,
         companies.c.id.label("company_id"),
@@ -189,7 +219,7 @@ def my_memberships(user: dict = Depends(get_current_user), db: Session = Depends
     rows = db.execute(
         select(*cols)
         .select_from(company_members.join(companies, company_members.c.company_id == companies.c.id))
-        .where(company_members.c.user_id == int(user["id"]))
+        .where(company_members.c.user_id == u_id)
         .order_by(company_members.c.id.asc())
     ).mappings().all()
 
@@ -211,6 +241,7 @@ def my_memberships(user: dict = Depends(get_current_user), db: Session = Depends
             }
         )
 
+    set_json(cache_key, out, settings.CACHE_TTL_MEMBERSHIPS)
     return out
 
 
@@ -223,6 +254,12 @@ def list_suppliers(
     q: str | None = None,  # alias
     db: Session = Depends(get_db),
 ):
+    term = (search or q or "").strip()
+    cache_key = make_key("suppliers", "list", limit, offset, term)
+    cached = get_json(cache_key)
+    if isinstance(cached, dict):
+        return cached
+
     base = select(companies)
 
     filters = []
@@ -233,7 +270,6 @@ def list_suppliers(
     elif "is_supplier" in companies.c:
         filters.append(companies.c.is_supplier == True)  # noqa: E712
 
-    term = (search or q or "").strip()
     if term and "name" in companies.c:
         filters.append(companies.c.name.ilike(f"%{term}%"))
 
@@ -243,7 +279,6 @@ def list_suppliers(
     total = db.execute(select(func.count()).select_from(base.subquery())).scalar_one()
     rows = db.execute(base.order_by(companies.c.id.desc()).limit(limit).offset(offset)).mappings().all()
 
-    # Contract: at minimum {id, name} (frontend tolerates extra fields)
     items = []
     for row in rows:
         r = dict(row)
@@ -256,4 +291,10 @@ def list_suppliers(
             }
         )
 
-    return drf_page(items=items, total=total, limit=limit, offset=offset, path=str(request.url.path))
+    response = drf_page(items=items, total=total, limit=limit, offset=offset, path=str(request.url.path))
+    set_json(cache_key, response, settings.CACHE_TTL_SUPPLIERS)
+    return response
+
+
+
+

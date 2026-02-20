@@ -10,6 +10,8 @@ from sqlalchemy import func, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.deps.auth import get_current_user
+from app.cache.redis_cache import get_json, invalidate_patterns, make_key, set_json
+from app.core.config import settings
 from app.db.deps import get_db
 from app.db.schema import catalog_product
 from app.db.schema import companies_companymember as company_members
@@ -158,6 +160,16 @@ def _serialize_order_full(db: Session, order_id: int) -> dict:
     return data
 
 
+def _invalidate_order_related_cache() -> None:
+    invalidate_patterns(
+        "v1:orders:*",
+        "v1:notifications:*",
+        "v1:deliveries:*",
+        "v1:products:*",
+        "v1:analytics:*",
+    )
+
+
 # ---------------------------
 # Routes (frontend-compatible)
 # ---------------------------
@@ -170,6 +182,11 @@ def list_orders(
     db: Session = Depends(get_db),
 ):
     u_id = int(user["id"])
+    cache_key = make_key("orders", "list", u_id, buyer_company_id or "_", limit, offset)
+    cached = get_json(cache_key)
+    if isinstance(cached, list):
+        return cached
+
     company_ids = _company_ids_for_user(db, u_id)
     if not company_ids:
         return []
@@ -209,7 +226,9 @@ def list_orders(
     )
 
     rows = db.execute(q).mappings().all()
-    return [OrderListRow(**dict(r)) for r in rows]
+    response = [OrderListRow(**dict(r)).model_dump() for r in rows]
+    set_json(cache_key, response, settings.CACHE_TTL_ORDERS_LIST)
+    return response
 
 
 @router.get("/{order_id}/", response_model=OrderDetailOut)
@@ -219,6 +238,7 @@ def order_detail(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    u_id = int(user["id"])
     o_id = _col(orders_order, "id")
     o_buyer = _col(orders_order, "buyer_company_id")
     o_supplier = _col(orders_order, "supplier_company_id")
@@ -250,8 +270,13 @@ def order_detail(
     if buyer_company_id is not None and int(header.get("buyer_company_id")) != buyer_company_id:
         raise HTTPException(404, detail="Order not found")
 
-    if not _is_order_participant(db, int(user["id"]), dict(header)):
+    if not _is_order_participant(db, u_id, dict(header)):
         raise HTTPException(403, detail="Not allowed")
+
+    cache_key = make_key("orders", "detail", u_id, order_id, buyer_company_id or "_")
+    cached = get_json(cache_key)
+    if isinstance(cached, dict):
+        return cached
 
     items_rows = db.execute(
         select(
@@ -266,8 +291,9 @@ def order_detail(
     ).mappings().all()
 
     items = [OrderItemOut(**dict(r)) for r in items_rows]
-
-    return OrderDetailOut(**dict(header), items=items)
+    response = OrderDetailOut(**dict(header), items=items).model_dump()
+    set_json(cache_key, response, settings.CACHE_TTL_ORDER_DETAIL)
+    return response
 
 
 @router.post("/create/", response_model=OrderCreateResponse)
@@ -358,6 +384,7 @@ def create_order(
             db.execute(insert(delivery_assignment).values(values))
 
         db.commit()
+        _invalidate_order_related_cache()
 
         return OrderCreateResponse(id=order_id, status=status)
 
@@ -372,6 +399,11 @@ def create_order(
 @router.get("/inbox/")
 def inbox(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     u_id = int(user["id"])
+    cache_key = make_key("orders", "inbox", u_id)
+    cached = get_json(cache_key)
+    if isinstance(cached, list):
+        return cached
+
     company_ids = _company_ids_for_user(db, u_id)
     if not company_ids:
         return []
@@ -384,12 +416,19 @@ def inbox(user: dict = Depends(get_current_user), db: Session = Depends(get_db))
             .order_by(orders_order.c.id.desc())
         ).all()
     ]
-    return [_serialize_order_full(db, oid) for oid in ids]
+    response = [_serialize_order_full(db, oid) for oid in ids]
+    set_json(cache_key, response, settings.CACHE_TTL_ORDERS_BOX)
+    return response
 
 
 @router.get("/outbox/")
 def outbox(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     u_id = int(user["id"])
+    cache_key = make_key("orders", "outbox", u_id)
+    cached = get_json(cache_key)
+    if isinstance(cached, list):
+        return cached
+
     company_ids = _company_ids_for_user(db, u_id)
     if not company_ids:
         return []
@@ -402,7 +441,9 @@ def outbox(user: dict = Depends(get_current_user), db: Session = Depends(get_db)
             .order_by(orders_order.c.id.desc())
         ).all()
     ]
-    return [_serialize_order_full(db, oid) for oid in ids]
+    response = [_serialize_order_full(db, oid) for oid in ids]
+    set_json(cache_key, response, settings.CACHE_TTL_ORDERS_BOX)
+    return response
 
 
 @router.post("/{order_id}/supplier_confirm/")
@@ -490,6 +531,7 @@ def supplier_confirm(order_id: int, user: dict = Depends(get_current_user), db: 
 
     db.execute(update(orders_order).where(orders_order.c.id == order_id).values({"status": "CONFIRMED"}))
     db.commit()
+    _invalidate_order_related_cache()
     return _serialize_order_full(db, order_id)
 
 
@@ -557,4 +599,5 @@ def cancel(order_id: int, user: dict = Depends(get_current_user), db: Session = 
 
     db.execute(update(orders_order).where(orders_order.c.id == order_id).values({"status": "CANCELLED"}))
     db.commit()
+    _invalidate_order_related_cache()
     return _serialize_order_full(db, order_id)

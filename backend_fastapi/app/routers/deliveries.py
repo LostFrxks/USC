@@ -8,6 +8,8 @@ from sqlalchemy import insert, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.deps.auth import get_current_user
+from app.cache.redis_cache import get_json, invalidate_patterns, make_key, set_json
+from app.core.config import settings
 from app.db.deps import get_db
 from app.db.schema import accounts_user as users
 from app.db.schema import companies_companymember as company_members
@@ -35,6 +37,11 @@ def _is_order_participant(db: Session, user_id: int, order_row: dict) -> bool:
     return int(order_row.get("buyer_company_id")) in ids or int(order_row.get("supplier_company_id")) in ids
 
 
+
+
+def _invalidate_delivery_related_cache() -> None:
+    invalidate_patterns("v1:deliveries:*", "v1:orders:*", "v1:notifications:*", "v1:analytics:*")
+
 class DeliveryUpsertPayload(BaseModel):
     order: int = Field(..., ge=1)
     courier: int | None = Field(default=None, ge=1)
@@ -49,6 +56,11 @@ class DeliverySetStatusPayload(BaseModel):
 @router.get("/deliveries/")
 def list_deliveries(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     u_id = int(user["id"])
+    cache_key = make_key("deliveries", "list", u_id)
+    cached = get_json(cache_key)
+    if isinstance(cached, list):
+        return cached
+
     company_ids = _company_ids_for_user(db, u_id)
 
     conds = [deliveries.c.courier_id == u_id]
@@ -64,7 +76,9 @@ def list_deliveries(user: dict = Depends(get_current_user), db: Session = Depend
     )
 
     rows = db.execute(q).mappings().all()
-    return [dict(r) for r in rows]
+    response = [dict(r) for r in rows]
+    set_json(cache_key, response, settings.CACHE_TTL_DELIVERIES)
+    return response
 
 
 @router.get("/deliveries/by_order/{order_id}/")
@@ -73,17 +87,23 @@ def get_delivery_by_order(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    u_id = int(user["id"])
+    cache_key = make_key("deliveries", "by_order", u_id, order_id)
+    cached = get_json(cache_key)
+    if isinstance(cached, dict):
+        return None if cached.get("__empty__") else cached
+
     order_row = db.execute(select(orders).where(orders.c.id == order_id)).mappings().first()
     if not order_row:
         raise HTTPException(404, detail="order not found")
 
-    if not _is_order_participant(db, int(user["id"]), dict(order_row)):
+    if not _is_order_participant(db, u_id, dict(order_row)):
         raise HTTPException(403, detail="Not allowed")
 
     row = db.execute(select(deliveries).where(deliveries.c.order_id == order_id)).mappings().first()
-    if not row:
-        return None
-    return dict(row)
+    response = dict(row) if row else None
+    set_json(cache_key, response if response is not None else {"__empty__": True}, settings.CACHE_TTL_DELIVERIES)
+    return response
 
 
 @router.post("/deliveries/upsert_for_order/")
@@ -122,6 +142,7 @@ def upsert_for_order(
             values["courier_id"] = courier_id
         db.execute(update(deliveries).where(deliveries.c.id == existing["id"]).values(values))
         db.commit()
+        _invalidate_delivery_related_cache()
         row = db.execute(select(deliveries).where(deliveries.c.id == existing["id"])).mappings().first()
         return dict(row) if row else dict(existing)
 
@@ -142,6 +163,7 @@ def upsert_for_order(
         ins = insert(deliveries).values(values).returning(_col(deliveries, "id"))
         delivery_id = int(db.execute(ins).scalar_one())
         db.commit()
+        _invalidate_delivery_related_cache()
     except Exception as e:
         db.rollback()
         raise HTTPException(400, detail=f"Upsert failed. DB says: {e}")
@@ -186,6 +208,7 @@ def set_status(
         db.execute(update(orders).where(orders.c.id == order_row["id"]).values({"status": "DELIVERED"}))
 
     db.commit()
+    _invalidate_delivery_related_cache()
 
     updated = db.execute(select(deliveries).where(deliveries.c.id == delivery_id)).mappings().first()
     return dict(updated) if updated else dict(delivery)

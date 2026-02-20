@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+﻿from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -12,6 +12,8 @@ from app.db.schema import catalog_product as products
 from app.db.schema import companies_company as companies
 from app.db.schema import companies_companymember as company_members
 from app.utils.pagination import drf_page
+from app.core.config import settings
+from app.cache.redis_cache import get_json, invalidate_patterns, make_key, set_json
 
 router = APIRouter(tags=["products"])
 
@@ -46,6 +48,17 @@ def _product_with_names_query():
         .select_from(
             p.outerjoin(co, p.c.supplier_company_id == co.c.id).outerjoin(c, p.c.category_id == c.c.id)
         )
+    )
+
+
+
+def _invalidate_product_related_cache() -> None:
+    invalidate_patterns(
+        "v1:products:*",
+        "v1:categories:*",
+        "v1:orders:*",
+        "v1:notifications:*",
+        "v1:analytics:*",
     )
 
 class ProductCreatePayload(BaseModel):
@@ -126,6 +139,11 @@ def list_products(
     in_stock: bool | None = None,
     db: Session = Depends(get_db),
 ):
+    cache_key = make_key("products", "list", limit, offset, search or "", category or "", supplier_company, in_stock)
+    cached = get_json(cache_key)
+    if isinstance(cached, dict):
+        return cached
+
     p = products
     c = categories
     q = _product_with_names_query()
@@ -153,9 +171,10 @@ def list_products(
     total = db.execute(select(func.count()).select_from(q.subquery())).scalar_one()
     rows = db.execute(q.order_by(p.c.id.desc()).limit(limit).offset(offset)).mappings().all()
 
-    # mappings() gives a flattened dict; good for frontend that expects raw DB-ish fields.
     items = [dict(r) for r in rows]
-    return drf_page(items=items, total=total, limit=limit, offset=offset, path=str(request.url.path))
+    response = drf_page(items=items, total=total, limit=limit, offset=offset, path=str(request.url.path))
+    set_json(cache_key, response, settings.CACHE_TTL_PRODUCTS)
+    return response
 
 @router.post("/products/")
 def create_product(
@@ -194,6 +213,7 @@ def create_product(
         ins = insert(products).values(values).returning(_product_col("id"))
         prod_id = int(db.execute(ins).scalar_one())
         db.commit()
+        _invalidate_product_related_cache()
     except Exception as e:
         db.rollback()
         raise HTTPException(400, detail=f"Product create failed. DB says: {e}")
@@ -239,6 +259,7 @@ def update_product(
     if values:
         db.execute(update(products).where(products.c.id == product_id).values(values))
         db.commit()
+        _invalidate_product_related_cache()
 
     row = db.execute(_product_with_names_query().where(products.c.id == product_id)).mappings().first()
     if not row:
@@ -261,7 +282,13 @@ def delete_product(
     try:
         db.execute(delete(products).where(products.c.id == product_id))
         db.commit()
+        _invalidate_product_related_cache()
+        _invalidate_product_related_cache()
     except Exception as e:
         db.rollback()
         raise HTTPException(400, detail=f"Product delete failed. DB says: {e}")
     return None
+
+
+
+

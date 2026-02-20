@@ -1,4 +1,4 @@
-export type Screen =
+﻿export type Screen =
   | "home"
   | "search"
   | "cart"
@@ -43,3 +43,4 @@ export type CreateOrderPayload = {
   delivery_method: DeliveryMethod;
   comment?: string;
 };
+

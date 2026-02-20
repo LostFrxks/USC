@@ -1,10 +1,10 @@
-/* ===========================
+﻿/* ===========================
    HOME
    =========================== */
 
 #screen-home {
   --home-chain-step: 240px;
-  padding: 14px 14px 0;
+  padding: 14px 14px calc(var(--tabbar-space) + env(safe-area-inset-bottom));
   background: transparent;
   position: relative;
   overflow: hidden;
@@ -621,7 +621,7 @@
 }
 
 .search-list li::before {
-  content: "🔍";
+  content: "рџ”Ќ";
   font-size: 14px;
 }
 
@@ -2874,11 +2874,11 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 140px); /* чтобы белый блок визуально тянулся вниз */
+  min-height: calc(100vh - 140px); /* С‡С‚РѕР±С‹ Р±РµР»С‹Р№ Р±Р»РѕРє РІРёР·СѓР°Р»СЊРЅРѕ С‚СЏРЅСѓР»СЃСЏ РІРЅРёР· */
   margin-bottom: 50px;
 }
 
-/* top (внутри карточки) */
+/* top (РІРЅСѓС‚СЂРё РєР°СЂС‚РѕС‡РєРё) */
 .cart-top {
   padding: 18px 18px 10px;
 }
@@ -3822,7 +3822,7 @@
 }
 
 /* ===========================
-   SUPPLIERS — same style as your CSS
+   SUPPLIERS вЂ” same style as your CSS
    =========================== */
 
 .supplier-list {
@@ -3843,7 +3843,7 @@
   justify-content: space-between;
   gap: 10px;
 
-  min-width: 0; /* важно чтобы ellipsis работал */
+  min-width: 0; /* РІР°Р¶РЅРѕ С‡С‚РѕР±С‹ ellipsis СЂР°Р±РѕС‚Р°Р» */
 }
 
 .supplier-left {
@@ -3875,7 +3875,7 @@
 }
 
 .supplier-name {
-  font-weight: 700;           /* как общий вайб у тебя */
+  font-weight: 700;           /* РєР°Рє РѕР±С‰РёР№ РІР°Р№Р± Сѓ С‚РµР±СЏ */
   font-size: 13px;
   color: #111827;
   line-height: 1.15;
@@ -3893,7 +3893,7 @@
   text-overflow: ellipsis;
 }
 
-/* кнопка в точности как твой .primary-button */
+/* РєРЅРѕРїРєР° РІ С‚РѕС‡РЅРѕСЃС‚Рё РєР°Рє С‚РІРѕР№ .primary-button */
 .supplier-open {
   border: none;
   border-radius: 999px;
@@ -3910,7 +3910,7 @@
   transform: scale(0.98);
 }
 
-/* ===== responsive в твоём стиле ===== */
+/* ===== responsive РІ С‚РІРѕС‘Рј СЃС‚РёР»Рµ ===== */
 @media (max-width: 360px) {
   .supplier-card {
     padding: 9px 10px;
@@ -3942,7 +3942,7 @@
 }
 
 
-/* поля */
+/* РїРѕР»СЏ */
 .field {
   display: flex;
   flex-direction: column;
@@ -3978,7 +3978,7 @@ textarea.field-input {
   line-height: 1.35;
 }
 
-/* итого */
+/* РёС‚РѕРіРѕ */
 .modal-total {
   margin-top: 2px;
   padding: 10px 12px;
@@ -3995,7 +3995,7 @@ textarea.field-input {
   font-size: 14px;
 }
 
-/* primary button — как твой .primary-button */
+/* primary button вЂ” РєР°Рє С‚РІРѕР№ .primary-button */
 .modal-primary {
   margin-top: 2px;
   width: 100%;
@@ -4020,12 +4020,12 @@ textarea.field-input {
 }
 
 /* ===========================
-   RESPONSIVE — in your style
+   RESPONSIVE вЂ” in your style
    =========================== */
 
 @media (min-width: 421px) {
   .modal-backdrop {
-    align-items: center; /* на больших экранах по центру */
+    align-items: center; /* РЅР° Р±РѕР»СЊС€РёС… СЌРєСЂР°РЅР°С… РїРѕ С†РµРЅС‚СЂСѓ */
   }
 }
 
@@ -5694,7 +5694,7 @@ textarea.field-input {
    =========================== */
 
 #screen-ai {
-  padding: 14px 14px 0;
+  padding: 14px 14px calc(var(--tabbar-space) + env(safe-area-inset-bottom));
 }
 
 #screen-profile {
@@ -6733,3 +6733,4 @@ textarea.field-input {
   font-size: 12px;
   color: #6b7280;
 }
+

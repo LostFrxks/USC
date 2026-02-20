@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopHeader from "../ui/TopHeader";
 import { queryAnalyticsAssistant, type AnalyticsAssistantResponse } from "../api/analytics";
+import { AI_TEXT } from "../constants/aiTexts";
 
 type ChatMessage = {
   id: string;
@@ -18,12 +19,7 @@ type ChatSession = {
   messages: ChatMessage[];
 };
 
-const QUICK_PROMPTS = [
-  "Почему выручка просела в последнем месяце?",
-  "Что сделать, чтобы вырасти в следующем месяце?",
-  "Где основные риски по заказам?",
-  "Какие действия приоритетнее на этой неделе?",
-] as const;
+const QUICK_PROMPTS = AI_TEXT.quickPrompts;
 
 function sessionKey(companyId: number | null | undefined, role: string | null | undefined) {
   return `usc.ai.sessions.${companyId ?? "none"}.${(role ?? "unknown").toLowerCase()}`;

@@ -7,6 +7,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.deps.auth import get_current_user
+from app.cache.redis_cache import get_json, make_key, set_json
+from app.core.config import settings
 from app.db.deps import get_db
 from app.db.schema import companies_companymember as company_members
 from app.db.schema import delivery_deliveryassignment as deliveries
@@ -35,8 +37,12 @@ def list_notifications(
     db: Session = Depends(get_db),
 ):
     u_id = int(user["id"])
-    company_ids = _company_ids_for_user(db, u_id)
+    cache_key = make_key("notifications", "list", u_id, limit)
+    cached = get_json(cache_key)
+    if isinstance(cached, list):
+        return cached
 
+    company_ids = _company_ids_for_user(db, u_id)
     events: list[dict] = []
 
     if company_ids:
@@ -99,14 +105,15 @@ def list_notifications(
                 }
             )
 
-    # sort + limit
     events.sort(key=lambda x: x.get("created_at") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     events = events[:limit]
 
-    return [
+    response = [
         {
             **e,
             "created_at": e["created_at"].isoformat() if e.get("created_at") else None,
         }
         for e in events
     ]
+    set_json(cache_key, response, settings.CACHE_TTL_NOTIFICATIONS)
+    return response

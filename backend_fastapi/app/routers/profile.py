@@ -7,6 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.deps.auth import get_current_user
+from app.cache.redis_cache import get_json, make_key, set_json
+from app.core.config import settings
 from app.db.deps import get_db
 from app.db.schema import accounts_user as users
 from app.db.schema import companies_company as companies
@@ -131,9 +133,25 @@ def _me_payload(*, user: dict, db: Session):
 
 @router.get("/me/")
 def me(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    return _me_payload(user=user, db=db)
+    u_id = int(user["id"])
+    cache_key = make_key("profile", "me", u_id)
+    cached = get_json(cache_key)
+    if isinstance(cached, dict):
+        return cached
+
+    payload = _me_payload(user=user, db=db)
+    set_json(cache_key, payload, settings.CACHE_TTL_PROFILE_ME)
+    return payload
 
 
 @router.get("/auth/me/")
 def me_auth(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    return _me_payload(user=user, db=db)
+    u_id = int(user["id"])
+    cache_key = make_key("profile", "auth_me", u_id)
+    cached = get_json(cache_key)
+    if isinstance(cached, dict):
+        return cached
+
+    payload = _me_payload(user=user, db=db)
+    set_json(cache_key, payload, settings.CACHE_TTL_PROFILE_ME)
+    return payload

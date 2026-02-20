@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { Category, Product } from "../types";
 import TopHeader from "../ui/TopHeader";
 import { ProductCard, ProductCardSkeleton } from "../ui/ProductCard";
@@ -33,6 +33,15 @@ const CATEGORIES: Array<{
   },
 ];
 
+const CATEGORY_TO_ID: Record<Category, number> = {
+  meat: 1,
+  milk: 2,
+  fish: 3,
+  bread: 4,
+  fruit: 5,
+  grain: 6,
+};
+
 export default function HomeScreen({
   active,
   cartCount,
@@ -50,11 +59,10 @@ export default function HomeScreen({
 }) {
   const [category, setCategory] = useState<Category>("meat");
   const [query, setQuery] = useState("");
-  // FastAPI ожидает category как ID (number). Пока маппим все food-категории на 1.
-  const categoryId = 1;
-  const { products, loading } = useProducts(categoryId, "");
 
-  // === infinite categories strip (loop) ===
+  const categoryId = CATEGORY_TO_ID[category];
+  const { products, loading, apiOk } = useProducts(categoryId, query.trim());
+
   const categoriesRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -82,24 +90,7 @@ export default function HomeScreen({
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
-  const displayProducts = useMemo(() => {
-    if (products.length >= 20 || products.length === 0) return products;
-    const out: Product[] = [];
-    for (let i = 0; i < 20; i += 1) {
-      out.push(products[i % products.length]);
-    }
-    return out;
-  }, [products]);
-
-  const filteredProducts = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return displayProducts;
-    return displayProducts.filter((p) => {
-      const name = String(p.name ?? "").toLowerCase();
-      const seller = String(p.seller ?? "").toLowerCase();
-      return name.includes(q) || seller.includes(q);
-    });
-  }, [displayProducts, query]);
+  const filteredProducts = useMemo(() => products ?? [], [products]);
 
   return (
     <section id="screen-home" className={`screen ${active ? "active" : ""}`}>
