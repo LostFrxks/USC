@@ -2,7 +2,7 @@
 
 ## What’s done (FastAPI backend)
 - FastAPI auth + JWT support (login/register/token/refresh) and `/me` profile endpoints.
-- DB schema is now defined explicitly in FastAPI (`backend_fastapi/app/db/schema.py`) and managed via Alembic (no reflection/autoload at runtime).
+- DB schema is now defined explicitly in FastAPI (`backend/app/db/schema.py`) and managed via Alembic (no reflection/autoload at runtime).
 - Deliveries endpoints (list, upsert_for_order, set_status).
 - Products/companies/categories endpoints aligned to frontend contracts:
   - `/api/products/` supports `search`, `category` (id or name), `supplier_company`, `in_stock`.
@@ -32,18 +32,18 @@
 
 ## Files changed (high-level)
 Backend FastAPI:
-- `backend_fastapi/app/main.py` (router includes)
-- `backend_fastapi/app/routers/auth.py` (new)
-- `backend_fastapi/app/routers/profile.py` (new)
-- `backend_fastapi/app/routers/deliveries.py` (new)
-- `backend_fastapi/app/routers/companies.py` (updated)
-- `backend_fastapi/app/routers/products.py` (updated)
-- `backend_fastapi/app/routers/categories.py` (updated)
-- `backend_fastapi/app/routers/orders.py` (updated)
-- `backend_fastapi/app/deps/auth.py` (new)
-- `backend_fastapi/app/utils/auth.py` (new)
-- `backend_fastapi/app/core/config.py` (JWT settings added)
-- `backend_fastapi/requirements.txt` (PyJWT + email-validator + Alembic)
+- `backend/app/main.py` (router includes)
+- `backend/app/routers/auth.py` (new)
+- `backend/app/routers/profile.py` (new)
+- `backend/app/routers/deliveries.py` (new)
+- `backend/app/routers/companies.py` (updated)
+- `backend/app/routers/products.py` (updated)
+- `backend/app/routers/categories.py` (updated)
+- `backend/app/routers/orders.py` (updated)
+- `backend/app/deps/auth.py` (new)
+- `backend/app/utils/auth.py` (new)
+- `backend/app/core/config.py` (JWT settings added)
+- `backend/requirements.txt` (PyJWT + email-validator + Alembic)
 
 Frontend:
 - `frontend/src/api/auth.ts` (login path)
@@ -55,7 +55,7 @@ Frontend:
 - `frontend/src/ui/TopHeader.tsx` (clean import)
 
 ## What’s ready to run
-FastAPI (from `backend_fastapi/`):
+FastAPI (from `backend/`):
 - `.\.venv\Scripts\python -m pip install -r requirements.txt`
 - Alembic migrations:
   - fresh DB: `.\.venv\Scripts\python -m alembic -c alembic.ini upgrade head`

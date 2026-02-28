@@ -1,0 +1,35 @@
+﻿2) Добавить backend/.env в .gitignore (сейчас игнорится только корневой .env).
+4) Спрятать JWT_SECRET_KEY в compose/env-secrets.
+5) Реализовать lifecycle refresh-токенов (ревокация, logout-all, blacklist).
+6) Добавить rate limit на login/register/OTP.
+7) Добавить lockout/captcha после N неудачных попыток.
+10) Добавить централизованный audit log действий.
+11) Добавить idempotency-key для создания заказа.
+12) Проверять соответствие product_id и supplier_company_id при создании заказа.
+13) Ввести формальную state-machine для заказа/доставки.
+14) Доработать бизнес-правила отмен/возвратов/частичных поставок.
+15) Сделать персистентные уведомления с read/unread в БД.
+16) Сделать реальный profile update API и связать с экраном редактирования.
+17) Добавить авто-refresh access токена в клиенте.
+19) Убрать debug console.log в app.
+20) Убрать uvicorn --reload из docker runtime.
+21) Убрать npm install на каждый старт frontend-контейнера.
+22) Разделить dev/prod compose и env.
+23) Добавить CI: lint + tests + build + smoke.
+24) Расширить backend-тесты.
+25) Добавить integration tests для ключевых API.
+26) Добавить frontend-тесты.
+27) Добавить e2e автосценарий demo checklist.
+28) Добавить метрики/наблюдаемость.
+29) Подключить Sentry/аналог.
+30) Добавить backup/rollback стратегию БД.
+31) Добавить версионирование API-контрактов и changelog.
+32) Добавить consumer-docs/OpenAPI docs для frontend.
+33) Удалить/доделать мертвый код и демо-модули.
+34) Доделать owner/admin/member permissions.
+35) Добавить модерацию/верификацию поставщиков.
+36) Добавить SLA/retry-политику для SMTP/LLM.
+37) Добавить лимиты payload/пагинации/поиска.
+38) Уточнить/унифицировать timezone и locale.
+39) Перенести company/role switch-логику на сервер.
+40) Закрыть security checklist перед релизом.

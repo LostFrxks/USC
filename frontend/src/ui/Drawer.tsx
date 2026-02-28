@@ -5,6 +5,7 @@ export function Drawer({
   onClose,
   onGo,
   onLogout,
+  onLogoutAll,
   onSwitchCompany,
   onRoleChange,
   companyName,
@@ -18,6 +19,7 @@ export function Drawer({
   onClose: () => void;
   onGo: (s: Screen) => void;
   onLogout: () => void;
+  onLogoutAll: () => void;
   onSwitchCompany: () => void;
   onRoleChange: (role: "buyer" | "supplier") => void;
   companyName?: string | null;
@@ -138,6 +140,11 @@ export function Drawer({
           <button className="drawer-link drawer-logout" onClick={onLogout}>
             <img src="/media/icon.png" alt="" />
             <span>Выйти</span>
+          </button>
+
+          <button className="drawer-link drawer-logout" onClick={onLogoutAll}>
+            <img src="/media/icon.png" alt="" />
+            <span>Выйти со всех устройств</span>
           </button>
         </nav>
       </aside>

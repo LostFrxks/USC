@@ -31,4 +31,4 @@ Versioned key namespace: `v1:*`
   - `v1:orders:*`, `v1:deliveries:*`, `v1:notifications:*`, `v1:products:*`, `v1:analytics:*`
 
 ## TTL defaults
-See `backend_fastapi/app/core/config.py` and `backend_fastapi/.env.example`.
+See `backend/app/core/config.py` and `backend/.env.example`.

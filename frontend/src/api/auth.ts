@@ -7,10 +7,10 @@ function storeTokens(data: TokenPair) {
   if (data.refresh) localStorage.setItem("usc_refresh_token", data.refresh);
 }
 
-export async function login(email: string, password: string) {
+export async function login(email: string, password: string, captchaToken?: string) {
   const data = await api<TokenPair>("/auth/login/", {
     method: "POST",
-    body: { email, password },
+    body: { email, password, ...(captchaToken ? { captcha_token: captchaToken } : {}) },
   });
   storeTokens(data);
 }
@@ -40,6 +40,7 @@ export async function requestPhoneCode(phone: string) {
 export async function verifyPhoneCode(payload: {
   phone: string;
   code: string;
+  captcha_token?: string;
   email?: string;
   first_name?: string;
   last_name?: string;
@@ -74,7 +75,28 @@ export async function verifyEmailCode(payload: {
   storeTokens(data);
 }
 
-export function logout() {
+export async function logoutRequest() {
+  const refresh = localStorage.getItem("usc_refresh_token");
+  if (!refresh) return;
+  await api<{ revoked: boolean }>("/auth/logout/", {
+    method: "POST",
+    body: { refresh },
+  }).catch(() => undefined);
+}
+
+export async function logoutAllRequest() {
+  await api<{ revoked_count: number }>("/auth/logout_all/", {
+    method: "POST",
+    auth: true,
+  });
+}
+
+export function logoutLocal() {
   localStorage.removeItem("usc_access_token");
   localStorage.removeItem("usc_refresh_token");
+}
+
+export async function logout() {
+  await logoutRequest();
+  logoutLocal();
 }

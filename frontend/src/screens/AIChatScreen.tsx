@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import TopHeader from "../ui/TopHeader";
-import { queryAnalyticsAssistant, type AnalyticsAssistantResponse } from "../api/analytics";
+import { streamAnalyticsAssistant, type AnalyticsAssistantResponse } from "../api/analytics";
 import { AI_TEXT } from "../constants/aiTexts";
 
 type ChatMessage = {
@@ -58,8 +58,16 @@ export default function AIChatScreen({
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamingAssistantId, setStreamingAssistantId] = useState<string | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [revealedCharsByMsgId, setRevealedCharsByMsgId] = useState<Record<string, number>>({});
+
   const historyRef = useRef<HTMLDivElement | null>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
+  const revealTimerRef = useRef<number | null>(null);
+  const activeMessagesRef = useRef<ChatMessage[]>([]);
+  const lastSessionIdRef = useRef<string | null>(null);
+
   const key = useMemo(() => sessionKey(companyId, role), [companyId, role]);
   const analyticsRole = (role || "").toLowerCase() === "supplier" ? "supplier" : "buyer";
 
@@ -97,6 +105,28 @@ export default function AIChatScreen({
   const currentSession = sessions.find((s) => s.id === currentId) ?? null;
 
   useEffect(() => {
+    activeMessagesRef.current = currentSession?.messages ?? [];
+  }, [currentSession?.messages]);
+
+  useEffect(() => {
+    const sid = currentSession?.id ?? null;
+    if (!sid) {
+      lastSessionIdRef.current = null;
+      setRevealedCharsByMsgId({});
+      return;
+    }
+    if (lastSessionIdRef.current === sid) return;
+    const session = currentSession;
+    if (!session) return;
+    lastSessionIdRef.current = sid;
+    const initial: Record<string, number> = {};
+    for (const msg of session.messages) {
+      if (msg.role === "assistant") initial[msg.id] = msg.text.length;
+    }
+    setRevealedCharsByMsgId(initial);
+  }, [currentSession]);
+
+  useEffect(() => {
     const sync = () => {
       if (window.innerWidth > 860) setMobileSidebarOpen(false);
     };
@@ -104,6 +134,70 @@ export default function AIChatScreen({
     window.addEventListener("resize", sync);
     return () => window.removeEventListener("resize", sync);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      streamAbortRef.current?.abort();
+      streamAbortRef.current = null;
+      if (revealTimerRef.current != null) {
+        window.clearInterval(revealTimerRef.current);
+        revealTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentSession) return;
+    const hasPendingReveal = currentSession.messages.some((msg) => {
+      if (msg.role !== "assistant") return false;
+      return (revealedCharsByMsgId[msg.id] ?? 0) < msg.text.length;
+    });
+
+    if (!hasPendingReveal) {
+      if (revealTimerRef.current != null) {
+        window.clearInterval(revealTimerRef.current);
+        revealTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (revealTimerRef.current != null) return;
+
+    revealTimerRef.current = window.setInterval(() => {
+      const liveMessages = activeMessagesRef.current;
+      let pendingAfterTick = false;
+
+      setRevealedCharsByMsgId((prev) => {
+        let changed = false;
+        const next = { ...prev };
+
+        for (const msg of liveMessages) {
+          if (msg.role !== "assistant") continue;
+          const target = msg.text.length;
+          const current = next[msg.id] ?? 0;
+          if (current < target) {
+            const remaining = target - current;
+            const step = remaining > 120 ? 3 : remaining > 40 ? 2 : 1;
+            const nextValue = Math.min(target, current + step);
+            next[msg.id] = nextValue;
+            changed = true;
+            if (nextValue < target) pendingAfterTick = true;
+          } else if (current > target) {
+            next[msg.id] = target;
+            changed = true;
+          }
+        }
+
+        if (!changed) return prev;
+        return next;
+      });
+
+      if (!pendingAfterTick && revealTimerRef.current != null) {
+        window.clearInterval(revealTimerRef.current);
+        revealTimerRef.current = null;
+      }
+    }, 24);
+  }, [currentSession, revealedCharsByMsgId]);
 
   useEffect(() => {
     const el = historyRef.current;
@@ -137,7 +231,7 @@ export default function AIChatScreen({
 
   const sendMessage = async (rawQuestion?: string) => {
     const question = (rawQuestion ?? input).trim();
-    if (!question || !companyId) return;
+    if (!question || !companyId || loading) return;
 
     let targetId = currentId;
     if (!targetId) {
@@ -171,42 +265,89 @@ export default function AIChatScreen({
       };
     });
 
+    const assistantMsgId = makeId("a");
+    updateSession(targetId, (s) => ({
+      ...s,
+      updatedAt: Date.now(),
+      messages: [
+        ...s.messages,
+        {
+          id: assistantMsgId,
+          role: "assistant",
+          text: "",
+          timestamp: Date.now(),
+        },
+      ],
+    }));
+
     setInput("");
     setLoading(true);
+    setStreamingAssistantId(assistantMsgId);
+
+    streamAbortRef.current?.abort();
+    streamAbortRef.current = new AbortController();
+
     try {
-      const res = await queryAnalyticsAssistant({
-        companyId,
-        role: analyticsRole,
-        question,
-        days: 365,
-      });
-      const assistantMsg: ChatMessage = {
-        id: makeId("a"),
-        role: "assistant",
-        text: res.summary,
-        timestamp: Date.now(),
-        data: res,
-      };
+      const res = await streamAnalyticsAssistant(
+        {
+          companyId,
+          role: analyticsRole,
+          question,
+          days: 365,
+        },
+        {
+          signal: streamAbortRef.current.signal,
+          onDelta: (chunk) => {
+            if (!chunk) return;
+            updateSession(targetId!, (s) => ({
+              ...s,
+              updatedAt: Date.now(),
+              messages: s.messages.map((m) =>
+                m.id === assistantMsgId
+                  ? {
+                      ...m,
+                      text: `${m.text}${chunk}`,
+                    }
+                  : m
+              ),
+            }));
+          },
+        }
+      );
+
       updateSession(targetId, (s) => ({
         ...s,
         updatedAt: Date.now(),
-        messages: [...s.messages, assistantMsg],
+        messages: s.messages.map((m) =>
+          m.id === assistantMsgId
+            ? {
+                ...m,
+                text: res.summary || m.text,
+                data: res,
+                timestamp: Date.now(),
+              }
+            : m
+        ),
       }));
     } catch {
-      const errMsg: ChatMessage = {
-        id: makeId("e"),
-        role: "assistant",
-        text: "Не удалось получить ответ. Попробуйте еще раз.",
-        timestamp: Date.now(),
-      };
       updateSession(targetId, (s) => ({
         ...s,
         updatedAt: Date.now(),
-        messages: [...s.messages, errMsg],
+        messages: s.messages.map((m) =>
+          m.id === assistantMsgId
+            ? {
+                ...m,
+                text: "Не удалось получить ответ. Попробуйте еще раз.",
+                timestamp: Date.now(),
+              }
+            : m
+        ),
       }));
       onNotify("Ошибка запроса к AI", "error");
     } finally {
       setLoading(false);
+      setStreamingAssistantId(null);
+      streamAbortRef.current = null;
     }
   };
 
@@ -299,8 +440,19 @@ export default function AIChatScreen({
           <div className="ai-history" ref={historyRef}>
             {currentSession?.messages.length ? (
               currentSession.messages.map((m) => (
-                <div key={m.id} className={`ai-msg ${m.role}`}>
-                  <div className="ai-msg-text">{m.text}</div>
+                <div key={m.id} className={`ai-msg ${m.role} ${m.id === streamingAssistantId ? "is-streaming" : ""}`}>
+                  <div className={`ai-msg-text ${m.role === "assistant" && (revealedCharsByMsgId[m.id] ?? 0) < m.text.length ? "revealing" : ""}`}>
+                    {m.id === streamingAssistantId && !m.text ? (
+                      <span className="ai-typing"><span /><span /><span /></span>
+                    ) : (
+                      <>
+                        {m.role === "assistant" ? m.text.slice(0, revealedCharsByMsgId[m.id] ?? 0) : m.text}
+                        {m.role === "assistant" && (revealedCharsByMsgId[m.id] ?? 0) < m.text.length ? (
+                          <span className="ai-reveal-caret" aria-hidden="true" />
+                        ) : null}
+                      </>
+                    )}
+                  </div>
                   {m.role === "assistant" && m.data?.probable_causes?.length ? (
                     <div className="ai-msg-section">
                       <div className="ai-msg-section-title">Почему так происходит</div>
@@ -328,11 +480,6 @@ export default function AIChatScreen({
                 {companyId ? "Выберите чат или начните новый диалог." : "Сначала выберите компанию, чтобы AI видел аналитику."}
               </div>
             )}
-            {loading ? (
-              <div className="ai-msg assistant loading">
-                <div className="ai-typing"><span /><span /><span /></div>
-              </div>
-            ) : null}
           </div>
           <form
             className="ai-input-row"
@@ -348,7 +495,15 @@ export default function AIChatScreen({
               disabled={!companyId || loading}
             />
             <button type="submit" disabled={!companyId || loading || !input.trim()}>
-              {loading ? "..." : ">"}
+              {loading ? (
+                <span className="ai-send-dots" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              ) : (
+                ">"
+              )}
             </button>
           </form>
         </div>

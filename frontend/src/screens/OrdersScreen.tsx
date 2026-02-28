@@ -411,7 +411,7 @@ export default function OrdersScreen({
   }, [orderedList]);
 
   return (
-    <section id="screen-orders" className={`screen ${active ? "active" : ""}`}>
+    <section id="screen-orders" data-testid="screen-orders" className={`screen ${active ? "active" : ""}`}>
       <SecondaryTopbar onBurger={onBurger} onNotifications={onOpenNotifications} notificationCount={notificationCount} />
 
       <header className="simple-header">
@@ -511,6 +511,7 @@ export default function OrdersScreen({
             return (
               <div
                 className="order-card"
+                data-testid={`order-card-${o.id}`}
                 key={o.id}
                 role="button"
                 tabIndex={0}

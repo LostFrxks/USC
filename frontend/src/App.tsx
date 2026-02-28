@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import HomeScreen from "./screens/HomeScreen";
 import SearchScreen from "./screens/SearchScreen";
 import CartScreen from "./screens/CartScreen";
@@ -23,7 +23,8 @@ import { useCart } from "./hooks/useCart";
 import { useToast } from "./hooks/useToast";
 import type { Product, Screen } from "./types";
 import type { Supplier } from "./api/suppliers";
-import { logout as clearAuth } from "./api/auth";
+import { logout as clearAuth, logoutAllRequest, logoutLocal } from "./api/auth";
+import { isApiError, SESSION_EXPIRED_EVENT } from "./api/client";
 import { fetchNotifications } from "./api/notifications";
 import { fetchMe, type MeProfile } from "./api/profile";
 
@@ -59,6 +60,7 @@ export default function App() {
     return Number.isFinite(num) ? num : null;
   });
   const [appRole, setAppRole] = useState<"buyer" | "supplier">(() => normalizeRole(localStorage.getItem("usc_app_role")));
+  const isSessionExpiringRef = useRef(false);
 
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [focusOrderId, setFocusOrderId] = useState<number | null>(null);
@@ -66,6 +68,44 @@ export default function App() {
   const [searchPreset, setSearchPreset] = useState<{ categoryId: number | null }>({ categoryId: null });
 
   const [splashAnimationDone, setSplashAnimationDone] = useState(!initialAuthed);
+  const handleSessionExpired = useCallback(() => {
+    if (isSessionExpiringRef.current) return;
+    isSessionExpiringRef.current = true;
+    logoutLocal();
+    localStorage.removeItem("usc_company_id");
+    localStorage.removeItem("usc_company_name");
+    localStorage.removeItem("usc_app_role");
+    setAuthed(false);
+    setNotificationCount(0);
+    setProfile(null);
+    setProfileError(null);
+    setProfileLoading(false);
+    setCompanyId(null);
+    setCompanyPickerOpen(false);
+    setDrawerOpen(false);
+    setDrawerScreen(null);
+    setOrdersOpen(false);
+    setSupplierView(null);
+    window.setTimeout(() => {
+      isSessionExpiringRef.current = false;
+    }, 50);
+  }, []);
+
+  useEffect(() => {
+    const onSessionExpired = () => handleSessionExpired();
+    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired as EventListener);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired as EventListener);
+  }, [handleSessionExpired]);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === "usc_access_token" && !event.newValue) {
+        handleSessionExpired();
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [handleSessionExpired]);
 
   useEffect(() => {
     if (!authed) {
@@ -120,8 +160,12 @@ export default function App() {
           localStorage.removeItem("usc_company_name");
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!alive) return;
+        if (isApiError(error) && error.status === 401) {
+          handleSessionExpired();
+          return;
+        }
         setProfileError("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u043f\u0440\u043e\u0444\u0438\u043b\u044c");
         setProfile(null);
       })
@@ -133,41 +177,47 @@ export default function App() {
     return () => {
       alive = false;
     };
-  }, [authed, profileNonce]);
+  }, [authed, profileNonce, handleSessionExpired]);
 
   useEffect(() => {
-    if (!authed) {
+    if (!authed || !localStorage.getItem("usc_access_token")) {
       setNotificationCount(0);
       return;
     }
 
     let alive = true;
+    let timer: number | null = null;
     const load = () => {
+      if (!localStorage.getItem("usc_access_token")) {
+        alive = false;
+        if (timer != null) window.clearInterval(timer);
+        handleSessionExpired();
+        return;
+      }
       fetchNotifications(30)
         .then((data) => {
           if (!alive) return;
-          const unread = data.filter((n) => n.is_new !== false).length;
-          setNotificationCount(unread);
+          setNotificationCount(data.unread_count ?? 0);
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (!alive) return;
+          if (isApiError(error) && error.status === 401) {
+            alive = false;
+            if (timer != null) window.clearInterval(timer);
+            handleSessionExpired();
+            return;
+          }
           setNotificationCount(0);
         });
     };
 
     load();
-    const timer = setInterval(load, 20000);
+    timer = window.setInterval(load, 20000);
     return () => {
       alive = false;
-      clearInterval(timer);
+      if (timer != null) window.clearInterval(timer);
     };
-  }, [authed]);
-
-  useEffect(() => {
-    if (drawerScreen === "notifications") {
-      setNotificationCount(0);
-    }
-  }, [drawerScreen]);
+  }, [authed, handleSessionExpired]);
 
   useEffect(() => {
     localStorage.setItem("usc_app_role", appRole);
@@ -216,18 +266,14 @@ export default function App() {
 
   const openDrawer = () => setDrawerOpen(true);
   const closeDrawer = () => setDrawerOpen(false);
-  const handleLogout = () => {
-    clearAuth();
-    localStorage.removeItem("usc_company_id");
-    localStorage.removeItem("usc_company_name");
-    localStorage.removeItem("usc_app_role");
-    setAuthed(false);
-    setProfile(null);
-    setCompanyId(null);
-    setDrawerOpen(false);
-    setDrawerScreen(null);
-    setOrdersOpen(false);
-    setSupplierView(null);
+  const handleLogout = async () => {
+    await clearAuth().catch(() => undefined);
+    handleSessionExpired();
+  };
+
+  const handleLogoutAll = async () => {
+    await logoutAllRequest().catch(() => undefined);
+    handleSessionExpired();
   };
 
   const handleSwitchCompany = () => {
@@ -250,7 +296,7 @@ export default function App() {
   };
 
   const openFilters = () => {
-    console.log("Open filters");
+    // Filters panel is not implemented yet.
   };
 
   const openSupplier = (s: Supplier) => {
@@ -349,6 +395,7 @@ export default function App() {
         onClose={closeDrawer}
         onGo={openDrawerScreen}
         onLogout={handleLogout}
+        onLogoutAll={handleLogoutAll}
         onSwitchCompany={() => setCompanyPickerOpen(true)}
         companyName={currentCompanyName}
         role={appRole}
@@ -464,6 +511,11 @@ export default function App() {
           onBurger={openDrawer}
           onOpenNotifications={() => openDrawerScreen("notifications")}
           notificationCount={notificationCount}
+          role={appRole}
+          companyId={companyId}
+          showCompanyBanner={!!needsCompany}
+          onPickCompany={() => setCompanyPickerOpen(true)}
+          onNotify={toast.show}
         />
 
         <ProfileEditScreen
@@ -471,7 +523,17 @@ export default function App() {
           onBurger={openDrawer}
           onOpenNotifications={() => openDrawerScreen("notifications")}
           notificationCount={notificationCount}
+          profile={profile}
+          activeCompanyId={companyId}
           onNotify={toast.show}
+          onSaved={(nextProfile) => {
+            setProfile(nextProfile);
+            setProfileNonce((x) => x + 1);
+            if (companyId) {
+              const company = nextProfile.companies.find((c) => c.company_id === companyId);
+              if (company) localStorage.setItem("usc_company_name", company.name || "");
+            }
+          }}
         />
 
         <NotificationsScreen
@@ -482,6 +544,8 @@ export default function App() {
           role={appRole}
           onOpenOrder={openOrderFromNotification}
           onNotify={toast.show}
+          onSessionExpired={handleSessionExpired}
+          onUnreadCountChange={setNotificationCount}
         />
 
         <AboutScreen

@@ -28,7 +28,50 @@ type ProductApi = {
   category_name?: string;
 };
 
+export type SupplierProduct = {
+  id: number;
+  supplierCompanyId: number | null;
+  categoryId: number | null;
+  name: string;
+  description: string;
+  price: number;
+  unit: string;
+  minQty: number;
+  inStock: boolean;
+  trackInventory: boolean;
+  stockQty: number | null;
+  supplierName: string | null;
+  categoryName: string | null;
+  createdAt: string | null;
+};
+
+export type CreateSupplierProductPayload = {
+  supplier_company_id: number;
+  category_id?: number | null;
+  name: string;
+  description?: string;
+  price: number;
+  unit?: string;
+  min_qty?: number;
+  in_stock?: boolean;
+  track_inventory?: boolean;
+  stock_qty?: number | null;
+};
+
+export type UpdateSupplierProductPayload = {
+  category_id?: number;
+  name?: string;
+  description?: string;
+  price?: number;
+  unit?: string;
+  min_qty?: number;
+  in_stock?: boolean;
+  track_inventory?: boolean;
+  stock_qty?: number;
+};
+
 const LIST_PRODUCTS = "/products/";
+const MY_SUPPLIER_PRODUCTS = "/products/my_supplier_products/";
 
 function pickImage(p: ProductApi, categoryId: number | null): string {
   const key = String(p.category_name || "").toLowerCase();
@@ -77,6 +120,34 @@ function normalize(p: ProductApi): Product {
   };
 }
 
+function toNumber(value: unknown, fallback = 0): number {
+  const num = typeof value === "number" ? value : Number(value ?? fallback);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function normalizeSupplierProduct(raw: ProductApi): SupplierProduct {
+  const supplierCompanyRaw = raw.supplier_company_id ?? raw.supplier_company ?? null;
+  const categoryRaw = raw.category_id ?? raw.category ?? null;
+  const stockRaw = raw.stock_qty ?? null;
+
+  return {
+    id: toNumber(raw.id),
+    supplierCompanyId: supplierCompanyRaw != null ? toNumber(supplierCompanyRaw) : null,
+    categoryId: categoryRaw != null ? toNumber(categoryRaw) : null,
+    name: String(raw.name ?? "").trim(),
+    description: String(raw.description ?? ""),
+    price: toNumber(raw.price, 0),
+    unit: String(raw.unit ?? ""),
+    minQty: toNumber(raw.min_qty, 1),
+    inStock: Boolean(raw.in_stock ?? true),
+    trackInventory: Boolean(raw.track_inventory ?? false),
+    stockQty: stockRaw == null ? null : toNumber(stockRaw, 0),
+    supplierName: raw.supplier_name ?? null,
+    categoryName: raw.category_name ?? null,
+    createdAt: raw.created_at ?? null,
+  };
+}
+
 export async function fetchProducts(params?: {
   categoryId?: number;
   q?: string;
@@ -92,4 +163,35 @@ export async function fetchProducts(params?: {
 
   const page = await api<ApiPage<ProductApi>>(url, { auth: false });
   return page.results.map(normalize);
+}
+
+export async function fetchMySupplierProducts(companyId?: number | null): Promise<SupplierProduct[]> {
+  const qs = new URLSearchParams();
+  if (companyId != null && Number.isFinite(companyId)) {
+    qs.set("company_id", String(companyId));
+  }
+  const url = qs.toString() ? `${MY_SUPPLIER_PRODUCTS}?${qs.toString()}` : MY_SUPPLIER_PRODUCTS;
+  const rows = await api<ProductApi[]>(url, { auth: true });
+  return (rows ?? []).map(normalizeSupplierProduct);
+}
+
+export async function createSupplierProduct(payload: CreateSupplierProductPayload): Promise<SupplierProduct> {
+  const row = await api<ProductApi>(LIST_PRODUCTS, { method: "POST", auth: true, body: payload });
+  return normalizeSupplierProduct(row);
+}
+
+export async function updateSupplierProduct(
+  productId: number,
+  payload: UpdateSupplierProductPayload
+): Promise<SupplierProduct> {
+  const row = await api<ProductApi>(`${LIST_PRODUCTS}${productId}/`, {
+    method: "PATCH",
+    auth: true,
+    body: payload,
+  });
+  return normalizeSupplierProduct(row);
+}
+
+export async function deleteSupplierProduct(productId: number): Promise<void> {
+  await api<void>(`${LIST_PRODUCTS}${productId}/`, { method: "DELETE", auth: true });
 }

@@ -13,7 +13,7 @@ export function ProductCard({
       : "по запросу";
 
   return (
-    <article className="product-card">
+    <article className="product-card" data-testid={`product-card-${(product as any).id}`}>
       <img
         src={(product as any).image}
         alt={(product as any).name}
@@ -38,7 +38,7 @@ export function ProductCard({
           <span className="muted">· {(product as any).reviews} оценок</span>
         </div>
 
-        <button className="primary-button" onClick={onAdd} type="button">
+        <button className="primary-button" data-testid={`product-add-${(product as any).id}`} onClick={onAdd} type="button">
           В корзину
         </button>
       </div>

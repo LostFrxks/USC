@@ -103,7 +103,7 @@ export default function CartScreen({
   };
 
   return (
-    <section id="screen-cart" className={`screen ${active ? "active" : ""}`}>
+    <section id="screen-cart" data-testid="screen-cart" className={`screen ${active ? "active" : ""}`}>
       <TopHeader onBurger={onBurger} badgeCount={cartCount} />
 
       <header className="simple-header cart-header-modern">
@@ -211,6 +211,7 @@ export default function CartScreen({
 
               <button
                 className="primary-button cart-checkout"
+                data-testid="cart-open-checkout"
                 type="button"
                 onClick={() => setCheckoutOpen((v) => !v)}
                 disabled={!canCheckout}
@@ -323,7 +324,7 @@ export default function CartScreen({
                   <button className="btn-secondary" type="button" onClick={() => setCheckoutOpen(false)} disabled={creating}>
                     {"\u041e\u0442\u043c\u0435\u043d\u0430"}
                   </button>
-                  <button className="btn-primary" type="button" onClick={submitOrder} disabled={!canSubmitOrder}>
+                  <button className="btn-primary" data-testid="cart-create-order" type="button" onClick={submitOrder} disabled={!canSubmitOrder}>
                     {creating ? "\u0421\u043e\u0437\u0434\u0430\u044e..." : "\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0437\u0430\u043a\u0430\u0437"}
                   </button>
                 </div>

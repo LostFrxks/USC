@@ -6,3 +6,8 @@
         entry: python scripts/check_encoding.py
         language: system
         pass_filenames: false
+      - id: check-no-generated-artifacts
+        name: check-no-generated-artifacts
+        entry: python scripts/check_no_generated_artifacts.py
+        language: system
+        pass_filenames: false

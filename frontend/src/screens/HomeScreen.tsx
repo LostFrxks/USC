@@ -61,7 +61,7 @@ export default function HomeScreen({
   const [query, setQuery] = useState("");
 
   const categoryId = CATEGORY_TO_ID[category];
-  const { products, loading, apiOk } = useProducts(categoryId, query.trim());
+  const { products, loading } = useProducts(categoryId, query.trim());
 
   const categoriesRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -93,7 +93,7 @@ export default function HomeScreen({
   const filteredProducts = useMemo(() => products ?? [], [products]);
 
   return (
-    <section id="screen-home" className={`screen ${active ? "active" : ""}`}>
+    <section id="screen-home" data-testid="screen-home" className={`screen ${active ? "active" : ""}`}>
       <TopHeader onBurger={onBurger} badgeCount={cartCount} />
 
       {showCompanyBanner ? (
@@ -173,7 +173,7 @@ export default function HomeScreen({
 
         <div className="premium-banner">USC Премиум</div>
 
-        <div className="product-grid" id="product-grid">
+        <div className="product-grid" id="product-grid" data-testid="home-product-grid">
           {loading ? (
             <>
               {Array.from({ length: 6 }).map((_, i) => (

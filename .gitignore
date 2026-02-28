@@ -3,10 +3,13 @@
 Thumbs.db
 .vscode/
 .idea/
+.serena/
 
 # Python
 __pycache__/
+**/__pycache__/
 *.py[cod]
+**/*.pyc
 *.pyo
 *.pyd
 *.so
@@ -14,8 +17,8 @@ __pycache__/
 .mypy_cache/
 .venv/
 venv/
-backend_fastapi/.venv/
-backend_fastapi/.venv_local/
+backend/.venv/
+backend/.venv_local/
 
 # Node
 node_modules/
@@ -24,9 +27,13 @@ frontend/node_modules/
 # Env files
 .env
 *.env.local
+backend/.env
+backend/.env.*
+!backend/.env.example
 
 # Build outputs
 frontend/dist/
+*.tsbuildinfo
 
 # Logs
 *.log

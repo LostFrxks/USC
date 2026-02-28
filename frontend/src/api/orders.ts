@@ -110,9 +110,13 @@ function normalizeStatus(raw: string): string {
       return "delivering";
     case "DELIVERED":
       return "delivered";
+    case "PARTIALLY_DELIVERED":
+      return "partially_delivered";
     case "CANCELLED":
     case "CANCELED":
       return "cancelled";
+    case "FAILED":
+      return "failed";
     default:
       return raw?.toLowerCase?.() ?? raw;
   }
@@ -225,10 +229,15 @@ export async function fetchOrdersOutbox(): Promise<Order[]> {
 }
 
 export async function createOrder(payload: CreateOrderPayload): Promise<CreateOrderResponse> {
+  const idempotencyKey =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return api<CreateOrderResponse>(CREATE, {
     method: "POST",
     body: payload,
     auth: true,
+    headers: { "Idempotency-Key": idempotencyKey },
   });
 }
 

@@ -44,6 +44,7 @@ export default function TabBar({
         <button
           key={t.key}
           className={`tab ${active === t.key ? "active" : ""}`}
+          data-testid={`tab-${t.key}`}
           type="button"
           onClick={() => onChange(t.key)}
         >

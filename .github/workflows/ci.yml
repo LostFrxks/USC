@@ -1,0 +1,187 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  backend-lint-and-tests:
+    name: backend-lint-and-tests
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite+pysqlite:///:memory:
+      REDIS_URL: ""
+      RATE_LIMIT_ENABLED: "false"
+      JWT_SECRET_KEY: test-jwt-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+      - name: Backend static check
+        run: python -m compileall backend/app backend/alembic
+      - name: Backend tests
+        run: pytest backend/tests -q --ignore=backend/tests/integration
+
+  backend-integration-postgres:
+    name: backend-integration-postgres
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: usc
+          POSTGRES_PASSWORD: usc123
+          POSTGRES_DB: usc_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U usc -d usc_db"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg2://usc:usc123@127.0.0.1:5432/usc_db
+      INTEGRATION_DATABASE_URL: postgresql+psycopg2://usc:usc123@127.0.0.1:5432/usc_db
+      REDIS_URL: ""
+      RATE_LIMIT_ENABLED: "false"
+      JWT_SECRET_KEY: test-jwt-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+      - name: Apply migrations
+        working-directory: backend
+        run: alembic upgrade head
+      - name: Run integration tests
+        run: pytest backend/tests/integration -q
+
+  frontend-lint-and-tests:
+    name: frontend-lint-and-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+      - name: Frontend lint
+        working-directory: frontend
+        run: npm run lint
+      - name: Frontend tests
+        working-directory: frontend
+        run: npm run test:ci
+
+  frontend-build:
+    name: frontend-build
+    runs-on: ubuntu-latest
+    needs: frontend-lint-and-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  smoke:
+    name: smoke
+    runs-on: ubuntu-latest
+    needs:
+      - backend-lint-and-tests
+      - backend-integration-postgres
+      - frontend-build
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: usc
+          POSTGRES_PASSWORD: usc123
+          POSTGRES_DB: usc_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U usc -d usc_db"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg2://usc:usc123@127.0.0.1:5432/usc_db
+      REDIS_URL: ""
+      JWT_SECRET_KEY: test-jwt-secret
+      RATE_LIMIT_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+      - name: Run migrations
+        working-directory: backend
+        run: alembic upgrade head
+      - name: Start backend
+        run: |
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > backend.log 2>&1 &
+        working-directory: backend
+      - name: Wait for backend
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/api/health > /tmp/health.json; then
+              break
+            fi
+            sleep 2
+          done
+          cat /tmp/health.json
+      - name: API smoke checks
+        run: |
+          curl -fsS http://127.0.0.1:8000/api/health
+          curl -fsS http://127.0.0.1:8000/api/health/cache
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    needs:
+      - backend-lint-and-tests
+      - frontend-build
+      - smoke
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run e2e golden path
+        working-directory: frontend
+        run: npm run e2e:ci

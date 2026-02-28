@@ -1,9 +1,68 @@
 import { API_BASE } from "../config";
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
+export const SESSION_EXPIRED_EVENT = "usc:session-expired";
+
+let lastSessionExpiredEventAt = 0;
+let refreshInFlight: Promise<string | null> | null = null;
+
+export class ApiError extends Error {
+  status: number;
+  method: HttpMethod;
+  path: string;
+  detail: string;
+
+  constructor(status: number, method: HttpMethod, path: string, detail: string) {
+    super(`API ${method} ${path} -> ${status}: ${detail}`);
+    this.name = "ApiError";
+    this.status = status;
+    this.method = method;
+    this.path = path;
+    this.detail = detail;
+  }
+}
+
+export function isApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError;
+}
 
 function getToken(): string | null {
   return localStorage.getItem("usc_access_token");
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+  const refresh = localStorage.getItem("usc_refresh_token");
+  if (!refresh) return null;
+
+  refreshInFlight = (async () => {
+    const res = await fetch(`${API_BASE}/auth/token/refresh/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { access?: string; refresh?: string };
+    if (!data?.access) return null;
+    localStorage.setItem("usc_access_token", data.access);
+    if (data.refresh) localStorage.setItem("usc_refresh_token", data.refresh);
+    return data.access;
+  })()
+    .catch(() => null)
+    .finally(() => {
+      refreshInFlight = null;
+    });
+
+  return refreshInFlight;
+}
+
+function emitSessionExpired(reason: "missing-token" | "unauthorized") {
+  const now = Date.now();
+  if (now - lastSessionExpiredEventAt < 400) return;
+  lastSessionExpiredEventAt = now;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: { reason } }));
+  }
 }
 
 export async function api<T>(
@@ -12,18 +71,39 @@ export async function api<T>(
     method?: HttpMethod;
     body?: unknown;
     auth?: boolean;
+    headers?: Record<string, string>;
   }
+): Promise<T> {
+  return apiInternal<T>(path, opts, false);
+}
+
+async function apiInternal<T>(
+  path: string,
+  opts:
+    | {
+        method?: HttpMethod;
+        body?: unknown;
+        auth?: boolean;
+        headers?: Record<string, string>;
+      }
+    | undefined,
+  retried: boolean
 ): Promise<T> {
   const method = opts?.method ?? "GET";
   const auth = opts?.auth ?? false;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    ...(opts?.headers ?? {}),
   };
 
   if (auth) {
     const token = getToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (!token) {
+      emitSessionExpired("missing-token");
+      throw new ApiError(401, method, path, "Missing access token");
+    }
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -33,6 +113,15 @@ export async function api<T>(
   });
 
   if (!res.ok) {
+    if (auth && res.status === 401 && !retried) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        return apiInternal<T>(path, opts, true);
+      }
+    }
+    if (auth && res.status === 401) {
+      emitSessionExpired("unauthorized");
+    }
     const text = await res.text().catch(() => "");
     let detail = text;
     try {
@@ -42,7 +131,7 @@ export async function api<T>(
     } catch {
       // keep raw response text
     }
-    throw new Error(`API ${method} ${path} -> ${res.status}: ${detail}`);
+    throw new ApiError(res.status, method, path, detail);
   }
 
   // если пустой ответ

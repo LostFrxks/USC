@@ -25,7 +25,7 @@ export default function SecondaryTopbar({
         {resolvedAddress} <span className="address-arrow">▼</span>
       </div>
 
-      <button className="icon-button notification-button" type="button" onClick={onNotifications} aria-label="Уведомления">
+      <button className="icon-button notification-button" data-testid="open-notifications" type="button" onClick={onNotifications} aria-label="�����������">
         <img src="/media/notifications.png" alt="Уведомления" />
         <span className={`icon-badge ${notificationCount > 0 ? "show" : ""}`}>{notificationCount > 0 ? notificationCount : ""}</span>
       </button>

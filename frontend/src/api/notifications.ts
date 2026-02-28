@@ -1,16 +1,38 @@
 import { api } from "./client";
 
 export type NotificationItem = {
-  id: string;
-  type: "order" | "delivery";
+  id: number;
+  domain: string;
+  event_type: string;
+  resource_type: string;
+  resource_id: string;
   title: string;
   text: string;
-  order_id?: number | null;
-  status?: string | null;
+  payload?: Record<string, unknown>;
   created_at?: string | null;
-  is_new?: boolean;
+  is_read: boolean;
+  read_at?: string | null;
+};
+
+export type NotificationListResponse = {
+  items: NotificationItem[];
+  unread_count: number;
 };
 
 export async function fetchNotifications(limit = 20) {
-  return api<NotificationItem[]>(`/notifications/?limit=${limit}`, { auth: true });
+  return api<NotificationListResponse>(`/notifications/?limit=${limit}`, { auth: true });
+}
+
+export async function markNotificationRead(notificationId: number) {
+  return api<{ updated: boolean }>(`/notifications/${notificationId}/read/`, {
+    method: "POST",
+    auth: true,
+  });
+}
+
+export async function markAllNotificationsRead() {
+  return api<{ updated_count: number }>("/notifications/read_all/", {
+    method: "POST",
+    auth: true,
+  });
 }

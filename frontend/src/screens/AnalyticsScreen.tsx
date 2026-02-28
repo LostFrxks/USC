@@ -62,6 +62,23 @@ function formatK(num: number) {
   return String(Math.round(num));
 }
 
+function formatMoney(num: number) {
+  if (!Number.isFinite(num)) return "0 сом";
+  return `${Math.round(num).toLocaleString("ru-RU")} сом`;
+}
+
+function severityLabel(level: "critical" | "warning" | "info"): string {
+  if (level === "critical") return "Критично";
+  if (level === "warning") return "Внимание";
+  return "Инфо";
+}
+
+function concentrationRiskLabel(level?: "low" | "medium" | "high"): string {
+  if (level === "high") return "Высокий риск";
+  if (level === "medium") return "Средний риск";
+  return "Низкий риск";
+}
+
 function parseMonthLabel(raw: string): string {
   if (!raw) return "";
   const parts = raw.split("-");
@@ -235,6 +252,8 @@ export default function AnalyticsScreen({
   const analyticsRole = isSupplier ? "supplier" : "buyer";
 
   const [data, setData] = useState<AnalyticsSummary | null>(null);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false);
+  const [showDelayedSkeleton, setShowDelayedSkeleton] = useState(false);
   const [marketLineMonth, setMarketLineMonth] = useState<string | null>(null);
   const [salesLineMonth, setSalesLineMonth] = useState<string | null>(null);
   const [assistantOpen] = useState(false);
@@ -260,20 +279,30 @@ export default function AnalyticsScreen({
   useEffect(() => {
     if (!active || !companyId) return;
     let alive = true;
-    setData(null);
+    setIsSummaryLoading(true);
+    setShowDelayedSkeleton(false);
+    const skeletonTimer = window.setTimeout(() => {
+      if (!alive) return;
+      setShowDelayedSkeleton(true);
+    }, 220);
 
     fetchAnalyticsSummary({ companyId, role: analyticsRole, days: 365 })
       .then((res) => {
         if (!alive) return;
         setData(res);
+        setIsSummaryLoading(false);
+        setShowDelayedSkeleton(false);
       })
       .catch(() => {
         if (!alive) return;
         setData(null);
+        setIsSummaryLoading(false);
+        setShowDelayedSkeleton(false);
       });
 
     return () => {
       alive = false;
+      window.clearTimeout(skeletonTimer);
     };
   }, [active, companyId, analyticsRole]);
 
@@ -342,9 +371,32 @@ export default function AnalyticsScreen({
   const topCategories = (data?.category_breakdown ?? []).slice(0, 6);
   const funnelRows = (data?.status_funnel ?? []).filter((x) => x.count > 0);
   const insights = data?.insights ?? [];
+  const analyticsModules = data?.analytics_modules;
+  const moduleAlerts = analyticsModules?.alerts ?? [];
+  const moduleActions = analyticsModules?.actions ?? [];
+  const buyerModules = analyticsModules?.buyer;
+  const supplierModules = analyticsModules?.supplier;
   const buyerRecommendations = data?.buyer_recommendations;
   const cheaperAlternatives = buyerRecommendations?.cheaper_alternatives ?? [];
-  const reliableSuppliers = buyerRecommendations?.reliable_suppliers ?? [];
+  const reliableSuppliersLegacy = buyerRecommendations?.reliable_suppliers ?? [];
+  const savingsWatchlist =
+    buyerModules?.savings_watchlist ??
+    cheaperAlternatives.map((alt) => ({
+      anchor_product_id: alt.anchor_product_id,
+      anchor_product_name: alt.anchor_product_name,
+      current_supplier_name: alt.anchor_supplier_name,
+      current_price: alt.anchor_price,
+      alt_supplier_name: alt.candidate_supplier_name,
+      alt_product_name: alt.candidate_product_name,
+      alt_price: alt.candidate_price,
+      savings_abs: alt.savings_abs,
+      savings_pct: alt.savings_pct,
+    }));
+  const supplierReliability = buyerModules?.supplier_reliability ?? reliableSuppliersLegacy;
+  const concentration = buyerModules?.concentration;
+  const priceCompetitiveness = supplierModules?.price_competitiveness;
+  const buyerRetention = supplierModules?.buyer_retention;
+  const revenueLeakage = supplierModules?.revenue_leakage;
   const salesValues = salesSeries.map((x) => x.value);
   const recent3 = salesSeries.slice(-3).map((x) => x.value);
   const volatilityPct = avg(salesValues) > 0 ? (stddev(salesValues) / avg(salesValues)) * 100 : 0;
@@ -384,7 +436,7 @@ export default function AnalyticsScreen({
     modelSignals.push(`Сезонность заметна: ${topMonth.label} vs ${lowMonth.label}, индекс ${seasonalityIndex.toFixed(2)}.`);
   }
   if (!modelSignals.length) modelSignals.push("Сигналы риска низкие, динамика стабильная.");
-  const showAnalyticsSkeleton = !showCompanyBanner && !data;
+  const showAnalyticsSkeleton = !showCompanyBanner && !data && isSummaryLoading && showDelayedSkeleton;
 
   const assistantStorageKey = useMemo(
     () => (companyId ? `usc.analytics.chat.${companyId}.${analyticsRole}` : null),
@@ -508,6 +560,21 @@ export default function AnalyticsScreen({
         </div>
       ) : null}
 
+      {!showCompanyBanner && data && moduleAlerts.length ? (
+        <div className="analytics-alert-strip" role="status" aria-live="polite">
+          {moduleAlerts.map((alert) => (
+            <article key={alert.id} className={`analytics-alert-chip ${alert.severity}`}>
+              <div className="analytics-alert-chip-top">
+                <span className="analytics-alert-chip-level">{severityLabel(alert.severity)}</span>
+                <span className="analytics-alert-chip-title">{alert.title}</span>
+              </div>
+              <div className="analytics-alert-chip-message">{alert.message}</div>
+              <div className="analytics-alert-chip-hint">{alert.action_hint}</div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+
       {showAnalyticsSkeleton ? (
         <div className="analytics-grid analytics-grid-skeleton">
           <div className="analytic-card">
@@ -586,6 +653,34 @@ export default function AnalyticsScreen({
         </div>
       ) : (
       <div className="analytics-grid">
+        <div className="analytic-card">
+          <div className="analytic-title">Приоритет действий</div>
+          {moduleActions.length ? (
+            <div className="analytics-action-queue">
+              {moduleActions.slice(0, 5).map((action, idx) => (
+                <div className="analytics-action-item" key={action.id}>
+                  <div className="analytics-action-head">
+                    <span className="analytics-action-rank">{`#${idx + 1}`}</span>
+                    <span className="analytics-action-title">{action.title}</span>
+                    <span className="analytics-action-priority">{`${Math.round(action.priority)}/100`}</span>
+                  </div>
+                  <div className="analytics-action-rationale">{action.rationale}</div>
+                  <div className="analytics-action-meta">
+                    <span>{`Уверенность ${(action.confidence * 100).toFixed(0)}%`}</span>
+                    {action.expected_impact_abs != null ? (
+                      <span>{`Эффект ${formatMoney(action.expected_impact_abs)}`}</span>
+                    ) : action.expected_impact_pct != null ? (
+                      <span>{`Эффект ~${action.expected_impact_pct.toFixed(1)}%`}</span>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="order-item-muted">Недостаточно данных для очереди действий</div>
+          )}
+        </div>
+
         <div className="analytic-card">
           <div className="analytic-title">Рынок</div>
           <div className="analytic-row">
@@ -891,20 +986,20 @@ export default function AnalyticsScreen({
         {!isSupplier ? (
           <div className="analytic-card">
             <div className="analytic-title">Выгодные альтернативы</div>
-            {cheaperAlternatives.length ? (
+            {savingsWatchlist.length ? (
               <div className="buyer-reco-list">
-                {cheaperAlternatives.slice(0, 4).map((alt) => (
-                  <div className="buyer-reco-item" key={`${alt.anchor_product_id}-${alt.candidate_product_id}`}>
+                {savingsWatchlist.slice(0, 4).map((alt) => (
+                  <div className="buyer-reco-item" key={`${alt.anchor_product_id}-${alt.alt_product_name}`}>
                     <div className="buyer-reco-head">
                       <span className="buyer-reco-product">{alt.anchor_product_name}</span>
-                      <span className="buyer-reco-save">{`-${alt.savings_pct.toFixed(1)}%`}</span>
+                      <span className="buyer-reco-save">{`-${Number(alt.savings_pct).toFixed(1)}%`}</span>
                     </div>
                     <div className="buyer-reco-route">
-                      <span>{`${alt.anchor_supplier_name} (${formatK(alt.anchor_price)})`}</span>
+                      <span>{`${alt.current_supplier_name} (${formatK(alt.current_price)})`}</span>
                       <span className="buyer-reco-arrow">→</span>
-                      <span>{`${alt.candidate_supplier_name} (${formatK(alt.candidate_price)})`}</span>
+                      <span>{`${alt.alt_supplier_name} (${formatK(alt.alt_price)})`}</span>
                     </div>
-                    <div className="buyer-reco-note">{alt.rationale}</div>
+                    <div className="buyer-reco-note">{`Потенциал экономии: ${formatMoney(alt.savings_abs)} (~${Number(alt.savings_pct).toFixed(1)}%).`}</div>
                   </div>
                 ))}
               </div>
@@ -917,9 +1012,9 @@ export default function AnalyticsScreen({
         {!isSupplier ? (
           <div className="analytic-card">
             <div className="analytic-title">Надежные поставщики</div>
-            {reliableSuppliers.length ? (
+            {supplierReliability.length ? (
               <div className="supplier-health-list">
-                {reliableSuppliers.slice(0, 5).map((supplier) => (
+                {supplierReliability.slice(0, 5).map((supplier) => (
                   <div className="supplier-health-item" key={supplier.supplier_company_id}>
                     <div className="supplier-health-head">
                       <span className="supplier-health-name">{supplier.supplier_name}</span>
@@ -930,11 +1025,147 @@ export default function AnalyticsScreen({
                       <span>{`Отмены ${supplier.cancel_rate_pct.toFixed(1)}%`}</span>
                       <span>{`Повторные ${supplier.repeat_share_pct.toFixed(1)}%`}</span>
                     </div>
+                    <div className="supplier-health-bars">
+                      <span style={{ width: `${Math.max(4, supplier.delivery_rate_pct)}%` }} />
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="order-item-muted">Недостаточно данных для оценки надежности поставщиков</div>
+            )}
+          </div>
+        ) : null}
+
+        {!isSupplier ? (
+          <div className="analytic-card">
+            <div className="analytic-title">Риск концентрации закупок</div>
+            {concentration ? (
+              <div className="analytics-concentration">
+                <div className="analytics-concentration-head">
+                  <span>{concentrationRiskLabel(concentration.risk_level)}</span>
+                  <span className={`analytics-concentration-pill ${concentration.risk_level}`}>
+                    {concentration.risk_level.toUpperCase()}
+                  </span>
+                </div>
+                <div className="analytics-concentration-row">
+                  <span>HHI поставщиков</span>
+                  <strong>{concentration.supplier_hhi.toFixed(2)}</strong>
+                </div>
+                <div className="analytics-concentration-bar">
+                  <span style={{ width: `${Math.min(100, concentration.supplier_hhi * 220)}%` }} />
+                </div>
+                <div className="analytics-concentration-row">
+                  <span>HHI категорий</span>
+                  <strong>{concentration.category_hhi.toFixed(2)}</strong>
+                </div>
+                <div className="analytics-concentration-bar">
+                  <span style={{ width: `${Math.min(100, concentration.category_hhi * 220)}%` }} />
+                </div>
+              </div>
+            ) : (
+              <div className="order-item-muted">Недостаточно данных для оценки концентрации</div>
+            )}
+          </div>
+        ) : null}
+
+        {isSupplier ? (
+          <div className="analytic-card">
+            <div className="analytic-title">Ценовая конкурентность</div>
+            {priceCompetitiveness ? (
+              <div className="supplier-module-grid">
+                <div className="supplier-module-kpi">
+                  <span>SKU в сравнении</span>
+                  <strong>{priceCompetitiveness.sku_compared}</strong>
+                </div>
+                <div className="supplier-module-kpi">
+                  <span>Выше рынка</span>
+                  <strong>{`${priceCompetitiveness.overpriced_share_pct.toFixed(1)}%`}</strong>
+                </div>
+                <div className="supplier-module-kpi">
+                  <span>Ниже рынка</span>
+                  <strong>{`${priceCompetitiveness.underpriced_share_pct.toFixed(1)}%`}</strong>
+                </div>
+                <div className="supplier-module-kpi">
+                  <span>Медианный gap</span>
+                  <strong>{`${priceCompetitiveness.median_gap_pct >= 0 ? "+" : ""}${priceCompetitiveness.median_gap_pct.toFixed(1)}%`}</strong>
+                </div>
+                {priceCompetitiveness.top_overpriced_skus.length ? (
+                  <div className="supplier-overpriced-list">
+                    {priceCompetitiveness.top_overpriced_skus.slice(0, 3).map((sku) => (
+                      <div className="supplier-overpriced-item" key={sku.product_id}>
+                        <span>{sku.name}</span>
+                        <span>{`+${sku.gap_pct.toFixed(1)}%`}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="order-item-muted">Недостаточно данных для оценки цены</div>
+            )}
+          </div>
+        ) : null}
+
+        {isSupplier ? (
+          <div className="analytic-card">
+            <div className="analytic-title">Удержание покупателей</div>
+            {buyerRetention ? (
+              <div className="supplier-module-grid">
+                <div className="supplier-module-kpi">
+                  <span>Новые</span>
+                  <strong>{buyerRetention.new_buyers}</strong>
+                </div>
+                <div className="supplier-module-kpi">
+                  <span>Повторные</span>
+                  <strong>{buyerRetention.returning_buyers}</strong>
+                </div>
+                <div className="supplier-module-kpi">
+                  <span>At-risk</span>
+                  <strong>{buyerRetention.at_risk_buyers}</strong>
+                </div>
+                <div className="supplier-module-kpi">
+                  <span>Repeat rate</span>
+                  <strong>{`${buyerRetention.repeat_rate_pct.toFixed(1)}%`}</strong>
+                </div>
+              </div>
+            ) : (
+              <div className="order-item-muted">Недостаточно данных по удержанию</div>
+            )}
+          </div>
+        ) : null}
+
+        {isSupplier ? (
+          <div className="analytic-card">
+            <div className="analytic-title">Утечка выручки</div>
+            {revenueLeakage ? (
+              <div className="supplier-module-grid">
+                <div className="supplier-module-kpi">
+                  <span>Отмены</span>
+                  <strong>{revenueLeakage.cancelled_orders}</strong>
+                </div>
+                <div className="supplier-module-kpi">
+                  <span>В pipeline</span>
+                  <strong>{revenueLeakage.pipeline_orders}</strong>
+                </div>
+                <div className="supplier-module-kpi">
+                  <span>Потери (cancel)</span>
+                  <strong>{formatMoney(revenueLeakage.cancelled_value_estimate)}</strong>
+                </div>
+                <div className="supplier-module-kpi">
+                  <span>Потенциал (pipeline)</span>
+                  <strong>{formatMoney(revenueLeakage.pipeline_value_estimate)}</strong>
+                </div>
+                <div className="analytics-leakage-meter">
+                  <span>Leakage score</span>
+                  <strong>{`${revenueLeakage.leakage_score.toFixed(1)}/100`}</strong>
+                  <div className="analytics-leakage-bar">
+                    <span style={{ width: `${Math.min(100, revenueLeakage.leakage_score)}%` }} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="order-item-muted">Недостаточно данных по потерям</div>
             )}
           </div>
         ) : null}
