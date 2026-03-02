@@ -3584,6 +3584,10 @@
   margin-top: 2px;
 }
 
+.checkout-inline-actions .coords-warning {
+  grid-column: 1 / -1;
+}
+
 .btn-secondary,
 .btn-primary {
   border: none;

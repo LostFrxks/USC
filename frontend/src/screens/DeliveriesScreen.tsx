@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import SecondaryTopbar from "../ui/SecondaryTopbar";
 import { fetchDeliveries, setDeliveryStatus, type Delivery } from "../api/deliveries";
+import SecondaryTopbar from "../ui/SecondaryTopbar";
+import { parseGeoTag, toOsmLink } from "../utils/geo";
 
 const STATUS_VALUES = ["ASSIGNED", "PICKED_UP", "ON_THE_WAY", "DELIVERED", "FAILED"] as const;
 const STATUSES = ["ALL", ...STATUS_VALUES] as const;
@@ -101,12 +102,10 @@ export default function DeliveriesScreen({
       DELIVERED: 0,
       FAILED: 0,
     };
-
     for (const d of items) {
       const key = statusKey(d.status);
       if (key !== "UNKNOWN") base[key] += 1;
     }
-
     return base;
   }, [items]);
 
@@ -149,12 +148,14 @@ export default function DeliveriesScreen({
           filtered.map((d) => {
             const key = statusKey(d.status);
             const statusClass = `delivery-status delivery-status--${key.toLowerCase()}`;
+            const geo = parseGeoTag(d.order_comment);
             return (
               <div className="delivery-card" key={d.id}>
                 <div className="delivery-row">
                   <div className="delivery-title">USC-{d.order_id}</div>
                   <div className={statusClass}>{statusLabel(d.status)}</div>
                 </div>
+
                 <div className="delivery-meta">
                   {d.tracking_link ? (
                     <a className="order-item-link" href={d.tracking_link} target="_blank" rel="noreferrer">
@@ -163,7 +164,13 @@ export default function DeliveriesScreen({
                   ) : (
                     <span className="order-item-muted">Без трек-ссылки</span>
                   )}
+                  {geo ? (
+                    <a className="order-item-link" href={toOsmLink(geo)} target="_blank" rel="noreferrer">
+                      Открыть точку
+                    </a>
+                  ) : null}
                 </div>
+
                 <div className="delivery-actions">
                   <select
                     className="order-status-select"

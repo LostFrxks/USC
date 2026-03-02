@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("demo golden path: login -> home -> analytics -> ai -> create order -> orders", async ({ page }) => {
+  let createOrderComment: string | null = null;
   let orders = [
     {
       id: 77,
@@ -149,13 +150,15 @@ test("demo golden path: login -> home -> analytics -> ai -> create order -> orde
     }
 
     if (path.endsWith("/api/orders/create/") && method === "POST") {
+      const payload = request.postDataJSON() as { comment?: string } | null;
+      createOrderComment = typeof payload?.comment === "string" ? payload.comment : null;
       const id = 100 + orders.length;
       orders = [
         {
           id,
           status: "PENDING",
           created_at: "2026-02-28T10:10:00Z",
-          comment: "Created from e2e",
+          comment: createOrderComment || "Created from e2e",
           items_count: 1,
           total: 100,
         },
@@ -238,8 +241,11 @@ test("demo golden path: login -> home -> analytics -> ai -> create order -> orde
   await page.getByTestId("tab-cart").click();
   await expect(page.getByTestId("screen-cart")).toBeVisible();
   await page.getByTestId("cart-open-checkout").click();
-  await page.getByTestId("cart-create-order").click();
+  await page.locator(".coords-row input").nth(0).fill("42.874600");
+  await page.locator(".coords-row input").nth(1).fill("74.569800");
+  await page.getByTestId("cart-create-order").click({ force: true });
 
+  expect(createOrderComment).toMatch(/\[\s*geo:-?\d+\.\d{6},-?\d+\.\d{6}\]/);
   await expect(page.getByTestId("screen-orders")).toBeVisible();
   await expect(page.getByTestId("order-card-101")).toBeVisible();
 });

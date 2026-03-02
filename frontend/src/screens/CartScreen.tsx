@@ -1,13 +1,13 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { createOrder } from "../api/orders";
 import type { ToastTone } from "../hooks/useToast";
 import type { CartItem } from "../types";
-import MapPicker from "../ui/MapPicker";
 import TopHeader from "../ui/TopHeader";
-import { appendGeoTag, isValidLatLng, type LatLng } from "../utils/geo";
+import { appendGeoTag, validateLatLngInputs, type LatLng } from "../utils/geo";
 import { logger } from "../utils/logger";
 
 type DeliveryMode = "YANDEX" | "SUPPLIER_COURIER" | "BUYER_COURIER";
+const MapPicker = lazy(() => import("../ui/MapPicker"));
 
 export default function CartScreen({
   active,
@@ -49,20 +49,16 @@ export default function CartScreen({
   const itemsCount = useMemo(() => items.reduce((acc, it) => acc + it.qty, 0), [items]);
   const canCheckout = !creating && itemsCount > 0 && Boolean(buyerCompanyId);
   const canSubmitOrder = canCheckout && address.trim().length > 0;
+  const coordInputState = useMemo(() => validateLatLngInputs(latInput, lngInput), [latInput, lngInput]);
+  const showCoordsWarning = coordInputState.kind === "invalid_number" || coordInputState.kind === "out_of_range";
 
   const syncCoordsFromInputs = (nextLatRaw: string, nextLngRaw: string) => {
-    const lat = Number(nextLatRaw.replace(",", "."));
-    const lng = Number(nextLngRaw.replace(",", "."));
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      setCoords(null);
+    const nextState = validateLatLngInputs(nextLatRaw, nextLngRaw);
+    if (nextState.kind === "valid") {
+      setCoords(nextState.coords);
       return;
     }
-    const next = { lat, lng };
-    if (!isValidLatLng(next)) {
-      setCoords(null);
-      return;
-    }
-    setCoords(next);
+    setCoords(null);
   };
 
   const applyCoords = (next: LatLng | null) => {
@@ -265,15 +261,23 @@ export default function CartScreen({
 
                 <div className="field">
                   <div className="field-label">{"\u041a\u043e\u043e\u0440\u0434\u0438\u043d\u0430\u0442\u044b (\u043e\u043f\u0446\u0438\u043e\u043d\u0430\u043b\u044c\u043d\u043e)"}</div>
-                  <MapPicker
-                    value={coords}
-                    disabled={creating}
-                    onChange={(next) => {
-                      applyCoords(next);
-                      setMapError(null);
-                    }}
-                    onError={(message) => setMapError(message)}
-                  />
+                  <Suspense
+                    fallback={
+                      <div className="map-box">
+                        <div className="map-inner is-loading" />
+                      </div>
+                    }
+                  >
+                    <MapPicker
+                      value={coords}
+                      disabled={creating}
+                      onChange={(next) => {
+                        applyCoords(next);
+                        setMapError(null);
+                      }}
+                      onError={(message) => setMapError(message)}
+                    />
+                  </Suspense>
                   <div className="coords-row">
                     <input
                       className="field-input"
@@ -298,6 +302,7 @@ export default function CartScreen({
                       disabled={creating}
                     />
                   </div>
+                  {coordInputState.message ? <div className="coords-error">{coordInputState.message}</div> : null}
 
                   <div className="map-actions">
                     <span className={`map-badge ${coords ? "ok" : ""}`}>
@@ -318,7 +323,7 @@ export default function CartScreen({
                             setMapError(null);
                           },
                           () => {
-                            // ignore geolocation errors
+                            setMapError("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u043f\u0440\u0435\u0434\u0435\u043b\u0438\u0442\u044c \u0433\u0435\u043e\u043f\u043e\u0437\u0438\u0446\u0438\u044e");
                           }
                         );
                       }}
@@ -355,6 +360,9 @@ export default function CartScreen({
                 </label>
 
                 <div className="checkout-inline-actions">
+                  {showCoordsWarning ? (
+                    <span className="coords-warning">{"\u041a\u043e\u043e\u0440\u0434\u0438\u043d\u0430\u0442\u044b \u043d\u0435 \u0431\u0443\u0434\u0443\u0442 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b"}</span>
+                  ) : null}
                   <button className="btn-secondary" type="button" onClick={() => setCheckoutOpen(false)} disabled={creating}>
                     {"\u041e\u0442\u043c\u0435\u043d\u0430"}
                   </button>

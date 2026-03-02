@@ -68,6 +68,48 @@ Recommended minimum:
 - high entropy random string (letters + numbers + symbols)
 - never commit to git
 
+## MVP map setup (free, no API key)
+
+Frontend uses `MapLibre GL JS` with a free OpenFreeMap style by default:
+
+- `VITE_MAP_STYLE_URL=https://tiles.openfreemap.org/styles/liberty`
+- `VITE_MAP_DEFAULT_LAT=42.8746`
+- `VITE_MAP_DEFAULT_LNG=74.5698`
+- `VITE_MAP_DEFAULT_ZOOM=12`
+
+This gives an interactive delivery map in checkout without paid providers.
+
+Attribution:
+- OpenStreetMap contributors: https://www.openstreetmap.org/copyright
+- OpenFreeMap: https://openfreemap.org/
+
+If map tiles are temporarily unavailable, checkout still works with manual lat/lng input.
+
+### Map smoke checklist (dev)
+
+Run with dev profile:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
+
+Acceptance checklist:
+1. Open Cart screen.
+2. Open checkout block.
+3. Click on map and ensure marker appears.
+4. Ensure `lat/lng` inputs sync with selected point.
+5. Click geolocation and ensure point is updated.
+6. Deny geolocation permission and ensure fallback/error text is shown.
+7. Create order.
+8. Open order details and verify `comment` contains `[geo:lat,lng]`.
+
+### Map runbook: if map is not loading
+
+1. Continue checkout using manual `lat/lng` fields.
+2. Verify frontend env values: `VITE_MAP_STYLE_URL`, `VITE_MAP_DEFAULT_LAT`, `VITE_MAP_DEFAULT_LNG`, `VITE_MAP_DEFAULT_ZOOM`.
+3. Open browser devtools and check failed tile/style requests.
+4. Try another style URL, then restart frontend container.
+
 ## Metrics and tracing
 
 - Backend metrics endpoint: `GET /api/metrics` (Prometheus format).

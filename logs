@@ -264,3 +264,31 @@ Implemented conditional AI assistant sections and reduced fallback templating:
 [2026-02-28 15:27:22 +06:00] Asset switch: replaced red chain background references in frontend/src/styles/screens.css from /media/red_chain.jpg and /media/red_chain.webp to /media/red_chain_fixed.png. Renamed media file to frontend/public/media/red_chain_fixed.png for explicit extension compatibility. Restarted frontend container.
 [2026-03-02 09:50:09 +06:00] Serena enabled for project USC; onboarding status checked (already performed).
 [2026-03-02 10:18:33 +06:00] Rule update: Serena enable/activation events do not need to be logged going forward.
+[2026-03-02 10:35:06 +06:00] Implemented MVP real map integration for checkout (Cart-only) with free stack MapLibre + OpenFreeMap and unchanged backend contract. Added dependency maplibre-gl and global map CSS import in frontend/src/styles.css. Added new reusable component frontend/src/ui/MapPicker.tsx (controlled coords, click-to-set marker, flyTo on updates, disabled mode handling, load/failure overlays, cleanup map.remove, OSM/OpenFreeMap attribution links). Added geo utility frontend/src/utils/geo.ts with isValidLatLng/formatGeoTag/appendGeoTag and tests frontend/src/utils/geo.test.ts. Integrated MapPicker into frontend/src/screens/CartScreen.tsx: replaced old external map link flow, synchronized map<->lat/lng inputs, geolocation updates map/inputs, added selected-point status chip, map error hint, and switched order comment composition to appendGeoTag while validating coord ranges. Enhanced map visuals in frontend/src/styles/components.css (glass map box, skeleton loading, overlay tips/fallback, attribution, status states). Added map env vars to .env.example, .env.dev.example, .env.prod.example (style URL + default center/zoom). Updated README with free MVP map setup and attribution guidance. Added component tests frontend/src/screens/CartScreen.test.tsx (checkout map render, manual coords sync, geo-tag sent in createOrder). Verification: npm run test:ci -- src/utils/geo.test.ts src/screens/CartScreen.test.tsx PASSED, npm run build PASSED, frontend container restarted.
+[2026-03-02 10:54:13 +06:00] Implemented map follow-up package (remaining items 1-6) end-to-end.
+- Added geo parsing/validation utilities in frontend/src/utils/geo.ts: parseGeoTag(), toOsmLink(), validateLatLngInputs() with explicit states (empty/invalid_number/out_of_range/valid).
+- Switched map loading to lazy runtime path: removed global maplibre css import from frontend/src/styles.css; MapPicker now uses dynamic import for maplibre-gl + CSS and stable refs to prevent remount flicker.
+- Updated Cart checkout UX (frontend/src/screens/CartScreen.tsx): Suspense-lazy MapPicker, explicit lat/lng validation errors, warning badge when invalid coords are ignored, geolocation error message; order submit still allowed with optional coords.
+- Implemented CheckoutModal parity (frontend/src/ui/CheckoutModal.tsx): same MapPicker + bidirectional coord sync + validation states + appendGeoTag() flow.
+- Added geo links in Orders and Deliveries UIs:
+  - frontend/src/screens/OrdersScreen.tsx parses order comment geo-tag and shows “Открыть точку”.
+  - frontend/src/screens/DeliveriesScreen.tsx parses delivery.order_comment and shows “Открыть точку”.
+- Extended deliveries contract backend+frontend:
+  - backend/app/routers/deliveries.py list endpoint now returns additive field order_comment from joined order.
+  - frontend/src/api/deliveries.ts Delivery type now includes order_comment?: string | null.
+- Extended E2E golden path (frontend/e2e/demo-golden.spec.ts): fills checkout coordinates and asserts POST /api/orders/create/ payload.comment contains valid [geo:lat,lng] tag; stabilized click with force to avoid animation instability.
+- Added/updated tests:
+  - frontend/src/utils/geo.test.ts
+  - frontend/src/screens/CartScreen.test.tsx
+  - frontend/src/ui/CheckoutModal.test.tsx
+  - backend/tests/test_deliveries_api.py
+- Updated docs in README.md:
+  - “Map smoke checklist (dev)” with strict 8-step manual acceptance flow.
+  - “Map runbook: if map is not loading”.
+
+Verification run:
+- frontend: npm run test:ci -> 6 test files passed.
+- frontend: npm run build -> passed.
+- frontend: npm run e2e:ci -- e2e/demo-golden.spec.ts -> passed.
+- backend (local with PYTHONPATH workaround): pytest backend/tests/test_state_machine_api.py backend/tests/test_deliveries_api.py -q -> passed.
+[2026-03-02 10:55:33 +06:00] Finalized map follow-up QA: fixed CartScreen coords warning rendering (escaped text issue), stabilized MapPicker init effect to avoid remount flicker, reran frontend lint/tests/build and Playwright golden map payload check (all passed; existing unrelated AnalyticsScreen lint warning remains).

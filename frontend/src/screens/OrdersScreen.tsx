@@ -11,6 +11,7 @@ import type { ToastTone } from "../hooks/useToast";
 import { useOrders } from "../hooks/useOrders";
 import OrderModal from "../ui/OrderModal";
 import SecondaryTopbar from "../ui/SecondaryTopbar";
+import { parseGeoTag, toOsmLink } from "../utils/geo";
 
 const JOURNEY_STEPS = ["Создан", "Подтвержден", "В пути", "Доставлен"] as const;
 type OrderFilter = "all" | "active" | "delivered" | "cancelled";
@@ -409,6 +410,7 @@ export default function OrdersScreen({
       cancelled: cancelledCount,
     };
   }, [orderedList]);
+  const selectedGeo = selected ? parseGeoTag(selected.comment) : null;
 
   return (
     <section id="screen-orders" data-testid="screen-orders" className={`screen ${active ? "active" : ""}`}>
@@ -507,6 +509,7 @@ export default function OrdersScreen({
             const metaParts = [date, o.comment].filter(Boolean);
             const meta = metaParts.join(" · ");
             const hint = nextStepHint(o, roleLower);
+            const geo = parseGeoTag(o.comment);
 
             return (
               <div
@@ -589,6 +592,18 @@ export default function OrdersScreen({
                       Отследить
                     </a>
                   )}
+
+                  {geo && (
+                    <a
+                      className="order-card-action-btn order-card-action-btn-link"
+                      href={toOsmLink(geo)}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Открыть точку
+                    </a>
+                  )}
                 </div>
               </div>
             );
@@ -613,6 +628,20 @@ export default function OrdersScreen({
               <div className="order-detail-row">
                 <span>Дата</span>
                 <b>{formatDate(selected.createdAt)}</b>
+              </div>
+            ) : null}
+
+            {selectedGeo ? (
+              <div className="order-detail-row">
+                <span>Точка доставки</span>
+                <a
+                  className="order-item-link"
+                  href={toOsmLink(selectedGeo)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Открыть точку
+                </a>
               </div>
             ) : null}
 

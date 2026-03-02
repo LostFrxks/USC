@@ -160,7 +160,7 @@ def list_deliveries(user: dict = Depends(get_current_user), db: Session = Depend
         conds.append(orders.c.supplier_company_id.in_(company_ids))
 
     q = (
-        select(deliveries)
+        select(deliveries, orders.c.comment.label("order_comment"))
         .select_from(deliveries.join(orders, deliveries.c.order_id == orders.c.id))
         .where(or_(*conds))
         .order_by(deliveries.c.created_at.desc() if "created_at" in deliveries.c else deliveries.c.id.desc())

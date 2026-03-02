@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
+import { appendGeoTag, validateLatLngInputs, type LatLng } from "../utils/geo";
+
+const MapPicker = lazy(() => import("./MapPicker"));
 
 export default function CheckoutModal({
   open,
@@ -19,17 +22,37 @@ export default function CheckoutModal({
 }) {
   const [address, setAddress] = useState("Улица Медерова, 161а");
   const [comment, setComment] = useState("");
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [coords, setCoords] = useState<LatLng | null>(null);
+  const [latInput, setLatInput] = useState("");
+  const [lngInput, setLngInput] = useState("");
+  const [mapError, setMapError] = useState<string | null>(null);
   const [deliveryMode, setDeliveryMode] = useState<"YANDEX" | "SUPPLIER_COURIER" | "BUYER_COURIER">(
     "SUPPLIER_COURIER"
   );
+
+  const coordInputState = useMemo(() => validateLatLngInputs(latInput, lngInput), [latInput, lngInput]);
+  const showCoordsWarning = coordInputState.kind === "invalid_number" || coordInputState.kind === "out_of_range";
+
+  const applyCoords = (next: LatLng | null) => {
+    setCoords(next);
+    setLatInput(next ? next.lat.toFixed(6) : "");
+    setLngInput(next ? next.lng.toFixed(6) : "");
+  };
+
+  const syncCoordsFromInputs = (nextLatRaw: string, nextLngRaw: string) => {
+    const nextState = validateLatLngInputs(nextLatRaw, nextLngRaw);
+    if (nextState.kind === "valid") {
+      setCoords(nextState.coords);
+      return;
+    }
+    setCoords(null);
+  };
 
   if (!open) return null;
 
   const submit = async () => {
     if (busy) return;
-    const geo = coords ? `\n[geo:${coords.lat.toFixed(6)},${coords.lng.toFixed(6)}]` : "";
-    const finalComment = `${comment.trim()}${geo}`.trim();
+    const finalComment = appendGeoTag(comment, coords);
     await onSubmit({ address: address.trim(), comment: finalComment, delivery_mode: deliveryMode });
   };
 
@@ -57,32 +80,54 @@ export default function CheckoutModal({
 
           <div className="field">
             <div className="field-label">Координаты (опционально)</div>
+            <Suspense
+              fallback={
+                <div className="map-box">
+                  <div className="map-inner is-loading" />
+                </div>
+              }
+            >
+              <MapPicker
+                value={coords}
+                disabled={busy}
+                onChange={(next) => {
+                  applyCoords(next);
+                  setMapError(null);
+                }}
+                onError={(message) => setMapError(message)}
+              />
+            </Suspense>
+
             <div className="coords-row">
               <input
                 className="field-input"
                 placeholder="Широта"
-                value={coords ? coords.lat : ""}
+                value={latInput}
                 onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (Number.isFinite(v)) setCoords({ lat: v, lng: coords?.lng ?? 0 });
-                  else setCoords(null);
+                  const nextLat = e.target.value;
+                  setLatInput(nextLat);
+                  syncCoordsFromInputs(nextLat, lngInput);
                 }}
                 disabled={busy}
               />
               <input
                 className="field-input"
                 placeholder="Долгота"
-                value={coords ? coords.lng : ""}
+                value={lngInput}
                 onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (Number.isFinite(v)) setCoords({ lat: coords?.lat ?? 0, lng: v });
-                  else setCoords(null);
+                  const nextLng = e.target.value;
+                  setLngInput(nextLng);
+                  syncCoordsFromInputs(latInput, nextLng);
                 }}
                 disabled={busy}
               />
             </div>
+            {coordInputState.message ? <div className="coords-error">{coordInputState.message}</div> : null}
 
             <div className="map-actions">
+              <span className={`map-badge ${coords ? "ok" : ""}`}>
+                {coords ? "Точка выбрана" : "Точка не выбрана"}
+              </span>
               <button
                 className="btn-secondary"
                 type="button"
@@ -90,27 +135,23 @@ export default function CheckoutModal({
                 onClick={() => {
                   if (!navigator.geolocation) return;
                   navigator.geolocation.getCurrentPosition(
-                    (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                    (pos) => {
+                      applyCoords({
+                        lat: Number(pos.coords.latitude.toFixed(6)),
+                        lng: Number(pos.coords.longitude.toFixed(6)),
+                      });
+                      setMapError(null);
+                    },
                     () => {
-                      // ignore geolocation errors
+                      setMapError("Не удалось определить геопозицию");
                     }
                   );
                 }}
               >
                 Определить мою геопозицию
               </button>
-
-              {coords && (
-                <a
-                  className="map-link"
-                  href={`https://www.openstreetmap.org/?mlat=${coords.lat}&mlon=${coords.lng}#map=16/${coords.lat}/${coords.lng}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Открыть на карте
-                </a>
-              )}
             </div>
+            {mapError ? <div className="map-hint map-error">{mapError}</div> : null}
           </div>
 
           <label className="field">
@@ -145,6 +186,7 @@ export default function CheckoutModal({
         </div>
 
         <div className="modal-actions">
+          {showCoordsWarning ? <span className="coords-warning">Координаты не будут добавлены</span> : null}
           <button className="btn-secondary" type="button" onClick={onClose} disabled={busy}>
             Отмена
           </button>

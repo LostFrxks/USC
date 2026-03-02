@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import maplibregl, { type LngLatLike } from "maplibre-gl";
+import type { LngLatLike, Map as MapLibreMap, MapMouseEvent, Marker as MapLibreMarker } from "maplibre-gl";
 import type { LatLng } from "../utils/geo";
 import { isValidLatLng } from "../utils/geo";
 
@@ -34,65 +34,105 @@ export default function MapPicker({
   onError?: (message: string) => void;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const markerRef = useRef<maplibregl.Marker | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const markerRef = useRef<MapLibreMarker | null>(null);
+  const maplibreRef = useRef<typeof import("maplibre-gl") | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const lastValueRef = useRef<LatLng | null>(null);
+  const initialValueRef = useRef<LatLng | null>(value);
+  const initialDisabledRef = useRef(disabled);
+  const disabledRef = useRef(disabled);
+  const onChangeRef = useRef(onChange);
+  const onErrorRef = useRef(onError);
 
   useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
+  useEffect(() => {
+    disabledRef.current = disabled;
+  }, [disabled]);
+
+  useEffect(() => {
+    let disposed = false;
     const host = hostRef.current;
     if (!host || mapRef.current) return;
 
-    const initial = isValidLatLng(value) ? value : { lat: MAP_DEFAULT_LAT, lng: MAP_DEFAULT_LNG };
-    const map = new maplibregl.Map({
-      container: host,
-      style: MAP_STYLE_URL,
-      center: toCenter(initial),
-      zoom: MAP_DEFAULT_ZOOM,
-      interactive: !disabled,
-      attributionControl: true,
-    });
+    const boot = async () => {
+      try {
+        const [maplibre] = await Promise.all([
+          import("maplibre-gl"),
+          import("maplibre-gl/dist/maplibre-gl.css"),
+        ]);
+        if (disposed || !hostRef.current) return;
 
-    mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+        maplibreRef.current = maplibre;
+        const initial = isValidLatLng(initialValueRef.current)
+          ? initialValueRef.current
+          : { lat: MAP_DEFAULT_LAT, lng: MAP_DEFAULT_LNG };
+        const map = new maplibre.Map({
+          container: hostRef.current,
+          style: MAP_STYLE_URL,
+          center: toCenter(initial),
+          zoom: MAP_DEFAULT_ZOOM,
+          interactive: !initialDisabledRef.current,
+          attributionControl: { compact: true },
+        });
 
-    const onLoad = () => {
-      setLoading(false);
-      setFailed(false);
-    };
-    const onMapClick = (e: maplibregl.MapMouseEvent) => {
-      if (disabled) return;
-      onChange({
-        lat: Number(e.lngLat.lat.toFixed(6)),
-        lng: Number(e.lngLat.lng.toFixed(6)),
-      });
-    };
-    const onMapError = () => {
-      if (map.isStyleLoaded()) return;
-      setFailed(true);
-      setLoading(false);
-      onError?.("Не удалось загрузить слой карты. Можно продолжить с ручным вводом координат.");
+        mapRef.current = map;
+        map.addControl(new maplibre.NavigationControl({ showCompass: false }), "top-right");
+
+        const onLoad = () => {
+          if (disposed) return;
+          setLoading(false);
+          setFailed(false);
+        };
+        const onMapClick = (e: MapMouseEvent) => {
+          if (disabledRef.current) return;
+          onChangeRef.current({
+            lat: Number(e.lngLat.lat.toFixed(6)),
+            lng: Number(e.lngLat.lng.toFixed(6)),
+          });
+        };
+        const onMapError = () => {
+          if (disposed) return;
+          if (map.isStyleLoaded()) return;
+          setFailed(true);
+          setLoading(false);
+          onErrorRef.current?.("Не удалось загрузить карту. Можно продолжить с ручным вводом координат.");
+        };
+
+        map.on("load", onLoad);
+        map.on("click", onMapClick);
+        map.on("error", onMapError);
+      } catch {
+        if (disposed) return;
+        setFailed(true);
+        setLoading(false);
+        onErrorRef.current?.("Не удалось загрузить карту. Можно продолжить с ручным вводом координат.");
+      }
     };
 
-    map.on("load", onLoad);
-    map.on("click", onMapClick);
-    map.on("error", onMapError);
+    void boot();
 
     return () => {
-      map.off("load", onLoad);
-      map.off("click", onMapClick);
-      map.off("error", onMapError);
+      disposed = true;
       markerRef.current?.remove();
       markerRef.current = null;
-      map.remove();
+      mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [disabled, onChange, onError, value]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    const maplibre = maplibreRef.current;
+    if (!map || !maplibre) return;
 
     if (!isValidLatLng(value)) {
       markerRef.current?.remove();
@@ -102,7 +142,7 @@ export default function MapPicker({
     }
 
     if (!markerRef.current) {
-      markerRef.current = new maplibregl.Marker({ color: "#355cff" }).setLngLat(toCenter(value)).addTo(map);
+      markerRef.current = new maplibre.Marker({ color: "#355cff" }).setLngLat(toCenter(value)).addTo(map);
     } else {
       markerRef.current.setLngLat(toCenter(value));
     }
@@ -145,7 +185,7 @@ export default function MapPicker({
     <div className="map-picker">
       <div className="map-box">
         <div ref={hostRef} className={`map-inner ${loading ? "is-loading" : ""}`} />
-        {loading ? <div className="map-overlay map-loading">Загружаем карту…</div> : null}
+        {loading ? <div className="map-overlay map-loading">Загружаем карту...</div> : null}
         {!loading && !failed ? <div className="map-overlay map-tip">Тапните по карте для точки доставки</div> : null}
         {failed ? (
           <div className="map-overlay map-fallback">Карта временно недоступна. Используйте ручной ввод координат ниже.</div>

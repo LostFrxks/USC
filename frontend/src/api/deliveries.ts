@@ -3,6 +3,7 @@ import { api } from "./client";
 export type Delivery = {
   id: number;
   order_id: number;
+  order_comment?: string | null;
   courier_id?: number | null;
   status?: string | null;
   tracking_link?: string | null;
