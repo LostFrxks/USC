@@ -90,6 +90,16 @@ catalog_product = Table(
     Column("id", BigInteger, primary_key=True),
     Column("name", String(255), nullable=False),
     Column("description", Text, nullable=False),
+    Column("shelf_life_days", BigInteger, nullable=True),
+    Column("storage_condition", String(120), nullable=True),
+    Column("origin_country", String(80), nullable=True),
+    Column("brand", String(120), nullable=True),
+    Column("manufacturer", String(120), nullable=True),
+    Column("package_type", String(80), nullable=True),
+    Column("net_weight_grams", Numeric(12, 3), nullable=True),
+    Column("allergens", Text, nullable=True),
+    Column("certifications", Text, nullable=True),
+    Column("lead_time_days", BigInteger, nullable=True),
     Column("price", Numeric(12, 2), nullable=False),
     Column("unit", String(50), nullable=False),
     Column("min_qty", Numeric(12, 2), nullable=False),
@@ -199,5 +209,31 @@ notification_user_state = Table(
     Column("user_id", BigInteger, ForeignKey("accounts_user.id", ondelete="CASCADE"), nullable=False),
     Column("is_read", Boolean, nullable=False),
     Column("read_at", DateTime(timezone=True), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+
+# --- AI chat persistence ---
+ai_chat_session = Table(
+    "ai_chat_session",
+    metadata,
+    Column("id", BigInteger, primary_key=True),
+    Column("user_id", BigInteger, ForeignKey("accounts_user.id", ondelete="CASCADE"), nullable=False),
+    Column("company_id", BigInteger, ForeignKey("companies_company.id", ondelete="CASCADE"), nullable=False),
+    Column("role", String(20), nullable=False),
+    Column("title", String(120), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("last_message_at", DateTime(timezone=True), nullable=True),
+)
+
+ai_chat_message = Table(
+    "ai_chat_message",
+    metadata,
+    Column("id", BigInteger, primary_key=True),
+    Column("session_id", BigInteger, ForeignKey("ai_chat_session.id", ondelete="CASCADE"), nullable=False),
+    Column("role", String(20), nullable=False),
+    Column("text", Text, nullable=False),
+    Column("payload_json", Text, nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
 )

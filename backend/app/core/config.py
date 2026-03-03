@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     """
     DATABASE_URL: str
     API_PREFIX: str = "/api"
+    CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
+    CORS_ALLOW_ORIGIN_REGEX: str = r"^https?://(?:localhost|127\.0\.0\.1|\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?$"
 
     JWT_SECRET_KEY: str = "dev-jwt-secret"
     JWT_ALGORITHM: str = "HS256"

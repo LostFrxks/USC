@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import type { Product } from "../types";
 import { ProductCard, ProductCardSkeleton } from "../ui/ProductCard";
+import ProductDetailsSheet from "../ui/ProductDetailsSheet";
 import TopHeader from "../ui/TopHeader";
 import { useProducts } from "../hooks/useProducts";
 import { fetchSuppliers, type Supplier } from "../api/suppliers";
@@ -27,6 +28,7 @@ export default function SearchScreen({
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const [supLoading, setSupLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -41,6 +43,10 @@ export default function SearchScreen({
     if (!active) return;
     setCategoryId(typeof initialCategoryId === "number" ? initialCategoryId : null);
   }, [active, initialCategoryId]);
+
+  useEffect(() => {
+    if (!active) setSelectedProduct(null);
+  }, [active]);
 
   const { products, loading } = useProducts(categoryId, debounced);
   const filteredProducts = useMemo(() => products ?? [], [products]);
@@ -109,7 +115,9 @@ export default function SearchScreen({
                 ))}
               </>
             ) : (
-              filteredProducts.map((p) => <ProductCard key={p.id} product={p} onAdd={() => onAdd(p)} />)
+              filteredProducts.map((p) => (
+                <ProductCard key={p.id} product={p} onAdd={() => onAdd(p)} onOpen={() => setSelectedProduct(p)} />
+              ))
             )}
           </div>
 
@@ -126,6 +134,15 @@ export default function SearchScreen({
           )}
         </>
       )}
+
+      <ProductDetailsSheet
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAdd={() => {
+          if (!selectedProduct) return;
+          onAdd(selectedProduct);
+        }}
+      />
     </section>
   );
 }

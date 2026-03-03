@@ -20,6 +20,17 @@ export type Product = {
   id: string;
   name: string;
   seller: string;
+  description?: string;
+  shelf_life_days?: number | null;
+  storage_condition?: string | null;
+  origin_country?: string | null;
+  brand?: string | null;
+  manufacturer?: string | null;
+  package_type?: string | null;
+  net_weight_grams?: number | null;
+  allergens?: string | null;
+  certifications?: string | null;
+  lead_time_days?: number | null;
   price: number;
   rating: string; // как в старом дизайне ("4.9")
   reviews: number;
@@ -43,4 +54,3 @@ export type CreateOrderPayload = {
   delivery_method: DeliveryMethod;
   comment?: string;
 };
-

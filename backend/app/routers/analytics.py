@@ -27,6 +27,14 @@ from app.db.schema import companies_company as companies
 from app.db.schema import companies_companymember as company_members
 from app.db.schema import orders_order as orders
 from app.db.schema import orders_orderitem as items
+from app.services.ai_chat import (
+    append_chat_message,
+    create_chat_session,
+    delete_chat_session,
+    get_chat_session,
+    list_chat_sessions,
+    rename_chat_session,
+)
 
 router = APIRouter(tags=["analytics"])
 
@@ -41,6 +49,17 @@ class AnalyticsAssistantRequest(BaseModel):
     days: int = Field(default=365, ge=7, le=3650)
     question: str = Field(..., min_length=2, max_length=500)
     selected_month: Optional[str] = Field(default=None)
+    chat_session_id: Optional[int] = Field(default=None, ge=1)
+
+
+class AnalyticsChatCreateRequest(BaseModel):
+    company_id: int = Field(..., ge=1)
+    role: str = Field(default="supplier")
+    title: Optional[str] = Field(default=None, max_length=120)
+
+
+class AnalyticsChatRenameRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=120)
 
 
 def _pct_delta(prev: float, cur: float) -> float | None:
@@ -247,7 +266,7 @@ def _safe_float(value, default: float = 0.0) -> float:
         return default
 
 
-_TECH_PREFIX_RE = re.compile(r"^\s*(?:\d+\.\s*)?analytics_modules\.[^:]+:\s*", flags=re.IGNORECASE)
+_TECH_PREFIX_RE = re.compile(r"(?:\d+\.\s*)?analytics_modules\.[\w.]+:\s*", flags=re.IGNORECASE)
 
 
 def _sanitize_assistant_line(text: str) -> str:
@@ -255,6 +274,7 @@ def _sanitize_assistant_line(text: str) -> str:
     if not clean:
         return ""
     clean = _TECH_PREFIX_RE.sub("", clean)
+    clean = re.sub(r"\s+(?:вот что можно сделать|что делать|практические шаги)\s*:\s*$", "", clean, flags=re.IGNORECASE)
     clean = re.sub(r"\s{2,}", " ", clean).strip()
     return clean
 
@@ -565,6 +585,70 @@ def _company_ids_for_user(db: Session, user_id: int) -> list[int]:
         int(r[0])
         for r in db.execute(select(company_members.c.company_id).where(company_members.c.user_id == user_id)).all()
     ]
+
+
+def _normalize_role(role: str | None) -> str:
+    role_norm = (role or "").strip().lower()
+    if role_norm not in {"supplier", "buyer"}:
+        return "supplier"
+    return role_norm
+
+
+def _ensure_chat_session_for_request(
+    *,
+    db: Session,
+    user_id: int,
+    company_id: int,
+    role: str,
+    question: str,
+    chat_session_id: int | None,
+) -> int:
+    if chat_session_id is not None:
+        existing = get_chat_session(
+            db,
+            session_id=int(chat_session_id),
+            user_id=int(user_id),
+            company_id=int(company_id),
+            role=role,
+        )
+        if not existing:
+            raise HTTPException(404, detail="Chat session not found")
+        return int(chat_session_id)
+
+    created = create_chat_session(
+        db,
+        user_id=int(user_id),
+        company_id=int(company_id),
+        role=role,
+        title=question,
+    )
+    return int(created["id"])
+
+
+def _persist_chat_turn(
+    *,
+    db: Session,
+    user_id: int,
+    chat_session_id: int,
+    question: str,
+    answer: dict,
+) -> None:
+    append_chat_message(
+        db,
+        session_id=int(chat_session_id),
+        user_id=int(user_id),
+        role="user",
+        text=str(question or ""),
+        payload=None,
+    )
+    append_chat_message(
+        db,
+        session_id=int(chat_session_id),
+        user_id=int(user_id),
+        role="assistant",
+        text=str(answer.get("summary") or ""),
+        payload=answer,
+    )
 
 
 def _month_key(value: str | date | datetime | None) -> str:
@@ -1865,21 +1949,146 @@ def analytics_summary(
     return response
 
 
+@router.get("/analytics/assistant/chats")
+def analytics_assistant_chats(
+    company_id: int = Query(..., ge=1),
+    role: str = Query("supplier"),
+    limit: int = Query(30, ge=1, le=100),
+    message_limit: int = Query(180, ge=1, le=500),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    u_id = int(user["id"])
+    role_norm = _normalize_role(role)
+    if int(company_id) not in _company_ids_for_user(db, u_id):
+        raise HTTPException(403, detail="Not allowed")
+
+    cache_key = make_key("analytics_chats", "list", u_id, company_id, role_norm, limit, message_limit)
+    cached = get_json(cache_key)
+    if isinstance(cached, dict) and isinstance(cached.get("sessions"), list):
+        return cached
+
+    sessions = list_chat_sessions(
+        db,
+        user_id=u_id,
+        company_id=int(company_id),
+        role=role_norm,
+        limit=int(limit),
+        message_limit=int(message_limit),
+    )
+    payload = {"sessions": sessions, "current_id": int(sessions[0]["id"]) if sessions else None}
+    set_json(cache_key, payload, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
+    return payload
+
+
+@router.post("/analytics/assistant/chats")
+def analytics_assistant_chat_create(
+    payload: AnalyticsChatCreateRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    u_id = int(user["id"])
+    role_norm = _normalize_role(payload.role)
+    if int(payload.company_id) not in _company_ids_for_user(db, u_id):
+        raise HTTPException(403, detail="Not allowed")
+
+    created = create_chat_session(
+        db,
+        user_id=u_id,
+        company_id=int(payload.company_id),
+        role=role_norm,
+        title=payload.title,
+    )
+    db.commit()
+    return {
+        "id": int(created["id"]),
+        "title": str(created.get("title") or "Новый чат"),
+        "created_at": created.get("created_at"),
+        "updated_at": created.get("updated_at"),
+        "last_message_at": created.get("last_message_at"),
+        "message_count": 0,
+        "preview": "",
+        "messages": [],
+    }
+
+
+@router.patch("/analytics/assistant/chats/{chat_session_id}")
+def analytics_assistant_chat_rename(
+    chat_session_id: int,
+    payload: AnalyticsChatRenameRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if chat_session_id <= 0:
+        raise HTTPException(400, detail="chat_session_id must be positive")
+    u_id = int(user["id"])
+    changed = rename_chat_session(
+        db,
+        session_id=int(chat_session_id),
+        user_id=u_id,
+        title=payload.title,
+    )
+    if not changed:
+        raise HTTPException(404, detail="Chat session not found")
+    row = get_chat_session(db, session_id=int(chat_session_id), user_id=u_id)
+    db.commit()
+    return {
+        "id": int(chat_session_id),
+        "title": str((row or {}).get("title") or payload.title.strip()),
+        "updated_at": (row or {}).get("updated_at"),
+    }
+
+
+@router.delete("/analytics/assistant/chats/{chat_session_id}")
+def analytics_assistant_chat_delete(
+    chat_session_id: int,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if chat_session_id <= 0:
+        raise HTTPException(400, detail="chat_session_id must be positive")
+    deleted = delete_chat_session(db, session_id=int(chat_session_id), user_id=int(user["id"]))
+    if not deleted:
+        raise HTTPException(404, detail="Chat session not found")
+    db.commit()
+    return {"deleted": True}
+
+
 @router.post("/analytics/assistant/query")
 def analytics_assistant_query(
     payload: AnalyticsAssistantRequest,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    u_id = int(user["id"])
+    role_norm = _normalize_role(payload.role)
+    if payload.company_id not in _company_ids_for_user(db, u_id):
+        raise HTTPException(403, detail="Not allowed")
+
+    chat_session_id = _ensure_chat_session_for_request(
+        db=db,
+        user_id=u_id,
+        company_id=int(payload.company_id),
+        role=role_norm,
+        question=payload.question,
+        chat_session_id=payload.chat_session_id,
+    )
+
     # Do not spend extra LLM request for moderation (quota-sensitive).
     # Use model prompt policy + a small explicit abuse guard.
     if _looks_abusive_minimal(payload.question):
-        return _policy_block_response()
+        blocked = _policy_block_response()
+        blocked["chat_session_id"] = chat_session_id
+        _persist_chat_turn(
+            db=db,
+            user_id=u_id,
+            chat_session_id=chat_session_id,
+            question=payload.question,
+            answer=blocked,
+        )
+        db.commit()
+        return blocked
 
-    u_id = int(user["id"])
-    role_norm = (payload.role or "").strip().lower()
-    if role_norm not in {"supplier", "buyer"}:
-        role_norm = "supplier"
     assistant_cache_key = _analytics_assistant_cache_key(
         user_id=u_id,
         company_id=payload.company_id,
@@ -1890,7 +2099,17 @@ def analytics_assistant_query(
     )
     cached_answer = get_json(assistant_cache_key)
     if isinstance(cached_answer, dict):
-        return cached_answer
+        out_cached = dict(cached_answer)
+        out_cached["chat_session_id"] = chat_session_id
+        _persist_chat_turn(
+            db=db,
+            user_id=u_id,
+            chat_session_id=chat_session_id,
+            question=payload.question,
+            answer=out_cached,
+        )
+        db.commit()
+        return out_cached
 
     actor_context = _build_actor_context(
         db=db,
@@ -1925,9 +2144,27 @@ def analytics_assistant_query(
                     llm["summary"] = fallback.get("summary", "")
                 llm["show_metrics"] = bool(llm.get("show_metrics", True))
         set_json(assistant_cache_key, llm, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
+        llm["chat_session_id"] = chat_session_id
+        _persist_chat_turn(
+            db=db,
+            user_id=u_id,
+            chat_session_id=chat_session_id,
+            question=payload.question,
+            answer=llm,
+        )
+        db.commit()
         return llm
     fallback = _assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
     set_json(assistant_cache_key, fallback, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
+    fallback["chat_session_id"] = chat_session_id
+    _persist_chat_turn(
+        db=db,
+        user_id=u_id,
+        chat_session_id=chat_session_id,
+        question=payload.question,
+        answer=fallback,
+    )
+    db.commit()
     return fallback
 
 
@@ -1938,12 +2175,19 @@ async def analytics_assistant_query_stream(
     db: Session = Depends(get_db),
 ):
     u_id = int(user["id"])
-    role_norm = (payload.role or "").strip().lower()
-    if role_norm not in {"supplier", "buyer"}:
-        role_norm = "supplier"
+    role_norm = _normalize_role(payload.role)
 
     if payload.company_id not in _company_ids_for_user(db, u_id):
         raise HTTPException(403, detail="Not allowed")
+
+    chat_session_id = _ensure_chat_session_for_request(
+        db=db,
+        user_id=u_id,
+        company_id=int(payload.company_id),
+        role=role_norm,
+        question=payload.question,
+        chat_session_id=payload.chat_session_id,
+    )
 
     assistant_cache_key = _analytics_assistant_cache_key(
         user_id=u_id,
@@ -1956,11 +2200,21 @@ async def analytics_assistant_query_stream(
     cached_answer = get_json(assistant_cache_key)
 
     async def stream_from_cached(answer: dict) -> AsyncIterator[str]:
+        out_cached = dict(answer)
+        out_cached["chat_session_id"] = chat_session_id
+        _persist_chat_turn(
+            db=db,
+            user_id=u_id,
+            chat_session_id=chat_session_id,
+            question=payload.question,
+            answer=out_cached,
+        )
+        db.commit()
         yield _ndjson_event({"type": "start"})
-        for chunk in _stream_text_chunks(str(answer.get("summary") or ""), chunk_size=14):
+        for chunk in _stream_text_chunks(str(out_cached.get("summary") or ""), chunk_size=14):
             yield _ndjson_event({"type": "delta", "text": chunk})
             await asyncio.sleep(0.02)
-        yield _ndjson_event({"type": "done", "data": answer})
+        yield _ndjson_event({"type": "done", "data": out_cached})
 
     if isinstance(cached_answer, dict):
         return StreamingResponse(
@@ -1987,6 +2241,15 @@ async def analytics_assistant_query_stream(
     async def stream_new_answer() -> AsyncIterator[str]:
         if _looks_abusive_minimal(payload.question):
             blocked = _policy_block_response()
+            blocked["chat_session_id"] = chat_session_id
+            _persist_chat_turn(
+                db=db,
+                user_id=u_id,
+                chat_session_id=chat_session_id,
+                question=payload.question,
+                answer=blocked,
+            )
+            db.commit()
             yield _ndjson_event({"type": "start"})
             for chunk in _stream_text_chunks(str(blocked.get("summary") or ""), chunk_size=14):
                 yield _ndjson_event({"type": "delta", "text": chunk})
@@ -2015,12 +2278,30 @@ async def analytics_assistant_query_stream(
         if yielded_any and streamed_text.strip():
             out = _assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
             out["summary"] = _sanitize_assistant_line(streamed_text.strip())
+            out["chat_session_id"] = chat_session_id
             set_json(assistant_cache_key, out, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
+            _persist_chat_turn(
+                db=db,
+                user_id=u_id,
+                chat_session_id=chat_session_id,
+                question=payload.question,
+                answer=out,
+            )
+            db.commit()
             yield _ndjson_event({"type": "done", "data": out})
             return
 
         fallback = _assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
+        fallback["chat_session_id"] = chat_session_id
         set_json(assistant_cache_key, fallback, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
+        _persist_chat_turn(
+            db=db,
+            user_id=u_id,
+            chat_session_id=chat_session_id,
+            question=payload.question,
+            answer=fallback,
+        )
+        db.commit()
         for chunk in _stream_text_chunks(str(fallback.get("summary") or ""), chunk_size=14):
             yield _ndjson_event({"type": "delta", "text": chunk})
             await asyncio.sleep(0.02)

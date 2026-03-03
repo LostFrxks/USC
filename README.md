@@ -11,6 +11,16 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 Open:
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8000/api/health
+- Frontend from another device in same network: `http://<YOUR_LAN_IP>:5173`
+
+Find your LAN IPv4 on Windows:
+
+```powershell
+ipconfig
+```
+
+Use the `IPv4 Address` value (for example `192.168.1.25`) in URL:
+`http://192.168.1.25:5173`
 
 ## Production-like start
 
@@ -232,3 +242,12 @@ GitHub Actions workflow: `.github/workflows/ci.yml` (single required pipeline `C
   - `POST /api/notifications/read_all/`
 - Profile update API:
   - `PATCH /api/profile/me/` updates user fields and active company fields (when user is member).
+
+## Codex Remote (phone control)
+
+- Detailed setup and phone connection guide:
+  - `docs/codex_remote.md`
+- Quick commands from project root:
+  - Bootstrap: `.\scripts\codex_remote\bootstrap.ps1`
+  - Start: `.\scripts\codex_remote\start.ps1`
+  - Stop: `.\scripts\codex_remote\stop.ps1`

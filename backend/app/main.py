@@ -25,13 +25,13 @@ if settings.SENTRY_DSN_BACKEND:
 
 app = FastAPI(title="USC API (FastAPI)", version="0.2")
 
+cors_allow_origins = [o.strip() for o in settings.CORS_ALLOW_ORIGINS.split(",") if o.strip()]
+cors_allow_origin_regex = settings.CORS_ALLOW_ORIGIN_REGEX.strip() or None
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
-    allow_origin_regex=r"^http://\d{1,3}(?:\.\d{1,3}){3}:5173$",
+    allow_origins=cors_allow_origins,
+    allow_origin_regex=cors_allow_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

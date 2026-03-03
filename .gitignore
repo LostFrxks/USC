@@ -37,3 +37,6 @@ frontend/dist/
 
 # Logs
 *.log
+
+# External tools
+ops/codex_remote/

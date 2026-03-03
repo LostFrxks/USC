@@ -16,6 +16,16 @@ type ProductApi = {
   category_id?: number | string | null;
   name: string;
   description?: string;
+  shelf_life_days?: number | null;
+  storage_condition?: string | null;
+  origin_country?: string | null;
+  brand?: string | null;
+  manufacturer?: string | null;
+  package_type?: string | null;
+  net_weight_grams?: number | string | null;
+  allergens?: string | null;
+  certifications?: string | null;
+  lead_time_days?: number | null;
   price: string;
   unit?: string;
   min_qty?: string;
@@ -34,6 +44,16 @@ export type SupplierProduct = {
   categoryId: number | null;
   name: string;
   description: string;
+  shelfLifeDays: number | null;
+  storageCondition: string | null;
+  originCountry: string | null;
+  brand: string | null;
+  manufacturer: string | null;
+  packageType: string | null;
+  netWeightGrams: number | null;
+  allergens: string | null;
+  certifications: string | null;
+  leadTimeDays: number | null;
   price: number;
   unit: string;
   minQty: number;
@@ -50,6 +70,16 @@ export type CreateSupplierProductPayload = {
   category_id?: number | null;
   name: string;
   description?: string;
+  shelf_life_days?: number | null;
+  storage_condition?: string | null;
+  origin_country?: string | null;
+  brand?: string | null;
+  manufacturer?: string | null;
+  package_type?: string | null;
+  net_weight_grams?: number | null;
+  allergens?: string | null;
+  certifications?: string | null;
+  lead_time_days?: number | null;
   price: number;
   unit?: string;
   min_qty?: number;
@@ -62,6 +92,16 @@ export type UpdateSupplierProductPayload = {
   category_id?: number;
   name?: string;
   description?: string;
+  shelf_life_days?: number | null;
+  storage_condition?: string | null;
+  origin_country?: string | null;
+  brand?: string | null;
+  manufacturer?: string | null;
+  package_type?: string | null;
+  net_weight_grams?: number | null;
+  allergens?: string | null;
+  certifications?: string | null;
+  lead_time_days?: number | null;
   price?: number;
   unit?: string;
   min_qty?: number;
@@ -109,6 +149,19 @@ function normalize(p: ProductApi): Product {
   return {
     id: String(p.id),
     name: p.name,
+    description: String(p.description ?? ""),
+    shelf_life_days:
+      p.shelf_life_days == null ? null : Number.isFinite(Number(p.shelf_life_days)) ? Number(p.shelf_life_days) : null,
+    storage_condition: p.storage_condition == null ? null : String(p.storage_condition),
+    origin_country: p.origin_country == null ? null : String(p.origin_country),
+    brand: p.brand == null ? null : String(p.brand),
+    manufacturer: p.manufacturer == null ? null : String(p.manufacturer),
+    package_type: p.package_type == null ? null : String(p.package_type),
+    net_weight_grams:
+      p.net_weight_grams == null ? null : Number.isFinite(Number(p.net_weight_grams)) ? Number(p.net_weight_grams) : null,
+    allergens: p.allergens == null ? null : String(p.allergens),
+    certifications: p.certifications == null ? null : String(p.certifications),
+    lead_time_days: p.lead_time_days == null ? null : Number.isFinite(Number(p.lead_time_days)) ? Number(p.lead_time_days) : null,
     seller: p.supplier_name ?? `Supplier #${rawSupplierCompany ?? "?"}`,
     price: Number(p.price ?? 0),
     rating: "4.8",
@@ -136,6 +189,23 @@ function normalizeSupplierProduct(raw: ProductApi): SupplierProduct {
     categoryId: categoryRaw != null ? toNumber(categoryRaw) : null,
     name: String(raw.name ?? "").trim(),
     description: String(raw.description ?? ""),
+    shelfLifeDays:
+      raw.shelf_life_days == null
+        ? null
+        : Number.isFinite(Number(raw.shelf_life_days))
+          ? Number(raw.shelf_life_days)
+          : null,
+    storageCondition: raw.storage_condition == null ? null : String(raw.storage_condition),
+    originCountry: raw.origin_country == null ? null : String(raw.origin_country),
+    brand: raw.brand == null ? null : String(raw.brand),
+    manufacturer: raw.manufacturer == null ? null : String(raw.manufacturer),
+    packageType: raw.package_type == null ? null : String(raw.package_type),
+    netWeightGrams:
+      raw.net_weight_grams == null ? null : Number.isFinite(Number(raw.net_weight_grams)) ? Number(raw.net_weight_grams) : null,
+    allergens: raw.allergens == null ? null : String(raw.allergens),
+    certifications: raw.certifications == null ? null : String(raw.certifications),
+    leadTimeDays:
+      raw.lead_time_days == null ? null : Number.isFinite(Number(raw.lead_time_days)) ? Number(raw.lead_time_days) : null,
     price: toNumber(raw.price, 0),
     unit: String(raw.unit ?? ""),
     minQty: toNumber(raw.min_qty, 1),

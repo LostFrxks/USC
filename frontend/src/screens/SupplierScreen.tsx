@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import type { Product } from "../types";
 import { ProductCard, ProductCardSkeleton } from "../ui/ProductCard";
+import ProductDetailsSheet from "../ui/ProductDetailsSheet";
 import { useSupplierProducts } from "../hooks/useSupplierProducts";
 
 export default function SupplierScreen({
@@ -20,17 +21,21 @@ export default function SupplierScreen({
 }) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 220);
     return () => clearTimeout(t);
   }, [query]);
 
+  useEffect(() => {
+    if (!active) setSelectedProduct(null);
+  }, [active]);
+
   const { products, loading, apiOk, apiEmpty } = useSupplierProducts(supplierId, debounced);
 
   return (
     <section id="screen-supplier" className={`screen ${active ? "active" : ""}`}>
-      {/* Мини-хедер в стиле твоего TopHeader */}
       <div className="topbar">
         <button type="button" className="burger" onClick={onBack} aria-label="Назад" title="Назад">
           ←
@@ -101,12 +106,21 @@ export default function SupplierScreen({
                   ))}
                 </>
               ) : (
-                products.map((p) => <ProductCard key={p.id} product={p} onAdd={() => onAdd(p)} />)
+                products.map((p) => <ProductCard key={p.id} product={p} onAdd={() => onAdd(p)} onOpen={() => setSelectedProduct(p)} />)
               )}
             </div>
           )}
         </div>
       </div>
+
+      <ProductDetailsSheet
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAdd={() => {
+          if (!selectedProduct) return;
+          onAdd(selectedProduct);
+        }}
+      />
     </section>
   );
 }

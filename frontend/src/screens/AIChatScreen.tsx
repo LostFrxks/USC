@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import TopHeader from "../ui/TopHeader";
 import { streamAnalyticsAssistant, type AnalyticsAssistantResponse } from "../api/analytics";
+import { fetchAiChatSessions, type AiChatSessionDto } from "../api/aiChat";
 import { AI_TEXT } from "../constants/aiTexts";
 
 type ChatMessage = {
@@ -13,13 +14,18 @@ type ChatMessage = {
 
 type ChatSession = {
   id: string;
+  remoteId?: number;
   title: string;
   createdAt: number;
   updatedAt: number;
+  preview?: string;
+  messageCount?: number;
   messages: ChatMessage[];
 };
 
 const QUICK_PROMPTS = AI_TEXT.quickPrompts;
+const MAX_SESSIONS = 60;
+const MAX_MESSAGES_PER_SESSION = 180;
 
 function sessionKey(companyId: number | null | undefined, role: string | null | undefined) {
   return `usc.ai.sessions.${companyId ?? "none"}.${(role ?? "unknown").toLowerCase()}`;
@@ -56,6 +62,26 @@ function sanitizeAssistantSummary(text: string): string {
   }
   const summary = lines.slice(0, cutoff).join("\n").trim();
   return summary || clean;
+}
+
+function mapRemoteSession(remote: AiChatSessionDto): ChatSession {
+  const messages: ChatMessage[] = (remote.messages || []).map((m) => ({
+    id: `srv-msg-${remote.id}-${m.id}`,
+    role: m.role === "user" ? "user" : "assistant",
+    text: String(m.text || ""),
+    timestamp: m.created_at ? new Date(m.created_at).getTime() : Date.now(),
+    data: m.role === "assistant" && m.payload ? m.payload : undefined,
+  }));
+  return {
+    id: `srv-${remote.id}`,
+    remoteId: remote.id,
+    title: String(remote.title || "Новый чат"),
+    createdAt: remote.created_at ? new Date(remote.created_at).getTime() : Date.now(),
+    updatedAt: remote.updated_at ? new Date(remote.updated_at).getTime() : Date.now(),
+    preview: String(remote.preview || ""),
+    messageCount: Number.isFinite(remote.message_count) ? remote.message_count : messages.length,
+    messages: messages.slice(-MAX_MESSAGES_PER_SESSION),
+  };
 }
 
 export default function AIChatScreen({
@@ -108,7 +134,7 @@ export default function AIChatScreen({
         setCurrentId(null);
         return;
       }
-      const clean = parsed.slice(0, 60);
+      const clean = parsed.slice(0, MAX_SESSIONS);
       setSessions(clean);
       setCurrentId(clean[0]?.id ?? null);
     } catch {
@@ -119,13 +145,43 @@ export default function AIChatScreen({
 
   useEffect(() => {
     try {
-      localStorage.setItem(key, JSON.stringify(sessions.slice(0, 60)));
+      localStorage.setItem(key, JSON.stringify(sessions.slice(0, MAX_SESSIONS)));
     } catch {
       // ignore
     }
   }, [key, sessions]);
 
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const remote = await fetchAiChatSessions({
+          companyId,
+          role: analyticsRole,
+          limit: MAX_SESSIONS,
+          messageLimit: MAX_MESSAGES_PER_SESSION,
+        });
+        if (cancelled) return;
+        const next = (remote.sessions || []).map(mapRemoteSession).slice(0, MAX_SESSIONS);
+        if (!next.length) return;
+        setSessions(next);
+        setCurrentId((curr) => (curr && next.some((s) => s.id === curr) ? curr : next[0]?.id ?? null));
+      } catch {
+        // keep local cache if remote is unavailable
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [analyticsRole, companyId]);
+
   const currentSession = sessions.find((s) => s.id === currentId) ?? null;
+
+  useEffect(() => {
+    if (currentId && sessions.some((s) => s.id === currentId)) return;
+    setCurrentId(sessions[0]?.id ?? null);
+  }, [currentId, sessions]);
 
   useEffect(() => {
     activeMessagesRef.current = currentSession?.messages ?? [];
@@ -238,7 +294,7 @@ export default function AIChatScreen({
       updatedAt: now,
       messages: [],
     };
-    setSessions((prev) => [next, ...prev]);
+    setSessions((prev) => [next, ...prev].slice(0, MAX_SESSIONS));
     setCurrentId(id);
     setInput("");
     setMobileSidebarOpen(false);
@@ -249,6 +305,7 @@ export default function AIChatScreen({
       prev
         .map((s) => (s.id === id ? updater(s) : s))
         .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, MAX_SESSIONS)
     );
   };
 
@@ -267,9 +324,10 @@ export default function AIChatScreen({
         updatedAt: now,
         messages: [],
       };
-      setSessions((prev) => [session, ...prev]);
+      setSessions((prev) => [session, ...prev].slice(0, MAX_SESSIONS));
       setCurrentId(targetId);
     }
+    let targetRemoteId = sessions.find((s) => s.id === targetId)?.remoteId;
 
     const userMsg: ChatMessage = {
       id: makeId("u"),
@@ -317,6 +375,7 @@ export default function AIChatScreen({
           role: analyticsRole,
           question,
           days: 365,
+          chatSessionId: targetRemoteId ?? null,
         },
         {
           signal: streamAbortRef.current.signal,
@@ -340,7 +399,10 @@ export default function AIChatScreen({
 
       updateSession(targetId, (s) => ({
         ...s,
+        ...(typeof res.chat_session_id === "number" ? { remoteId: res.chat_session_id, id: `srv-${res.chat_session_id}` } : {}),
         updatedAt: Date.now(),
+        messageCount: (s.messageCount ?? s.messages.length) + 1,
+        preview: res.summary || "",
         messages: s.messages.map((m) =>
           m.id === assistantMsgId
             ? {
@@ -352,6 +414,11 @@ export default function AIChatScreen({
             : m
         ),
       }));
+      if (typeof res.chat_session_id === "number") {
+        const newSessionId = `srv-${res.chat_session_id}`;
+        setCurrentId((curr) => (curr === targetId ? newSessionId : curr));
+        targetRemoteId = res.chat_session_id;
+      }
     } catch {
       updateSession(targetId, (s) => ({
         ...s,

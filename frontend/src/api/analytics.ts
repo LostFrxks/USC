@@ -127,6 +127,7 @@ export type AnalyticsAssistantResponse = {
   actions: string[];
   confidence: number;
   focus_month: string | null;
+  chat_session_id?: number;
   show_metrics?: boolean;
   metrics: {
     mom_pct: number | null;
@@ -156,6 +157,7 @@ export async function queryAnalyticsAssistant(params: {
   question: string;
   days?: number;
   selectedMonth?: string | null;
+  chatSessionId?: number | null;
 }) {
   return api<AnalyticsAssistantResponse>("/analytics/assistant/query", {
     method: "POST",
@@ -166,6 +168,7 @@ export async function queryAnalyticsAssistant(params: {
       question: params.question,
       days: params.days ?? 365,
       selected_month: params.selectedMonth ?? null,
+      chat_session_id: params.chatSessionId ?? null,
     },
   });
 }
@@ -177,6 +180,7 @@ export async function streamAnalyticsAssistant(
     question: string;
     days?: number;
     selectedMonth?: string | null;
+    chatSessionId?: number | null;
   },
   handlers: {
     onStart?: () => void;
@@ -197,6 +201,7 @@ export async function streamAnalyticsAssistant(
       question: params.question,
       days: params.days ?? 365,
       selected_month: params.selectedMonth ?? null,
+      chat_session_id: params.chatSessionId ?? null,
     }),
     signal: handlers.signal,
   });

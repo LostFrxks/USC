@@ -66,6 +66,16 @@ class ProductCreatePayload(BaseModel):
     category_id: int | None = None
     name: str = Field(min_length=1)
     description: str | None = None
+    shelf_life_days: int | None = Field(default=None, ge=0)
+    storage_condition: str | None = None
+    origin_country: str | None = None
+    brand: str | None = None
+    manufacturer: str | None = None
+    package_type: str | None = None
+    net_weight_grams: float | None = Field(default=None, ge=0)
+    allergens: str | None = None
+    certifications: str | None = None
+    lead_time_days: int | None = Field(default=None, ge=0)
     price: float = Field(..., gt=0)
     unit: str | None = None
     min_qty: float | None = None
@@ -77,6 +87,16 @@ class ProductUpdatePayload(BaseModel):
     category_id: int | None = None
     name: str | None = None
     description: str | None = None
+    shelf_life_days: int | None = Field(default=None, ge=0)
+    storage_condition: str | None = None
+    origin_country: str | None = None
+    brand: str | None = None
+    manufacturer: str | None = None
+    package_type: str | None = None
+    net_weight_grams: float | None = Field(default=None, ge=0)
+    allergens: str | None = None
+    certifications: str | None = None
+    lead_time_days: int | None = Field(default=None, ge=0)
     price: float | None = None
     unit: str | None = None
     min_qty: float | None = None
@@ -202,6 +222,26 @@ def create_product(
     # Provide safe defaults for NOT NULL columns even if DB defaults are absent.
     if "description" in products.c:
         values["description"] = payload.description if payload.description is not None else ""
+    if "shelf_life_days" in products.c and payload.shelf_life_days is not None:
+        values["shelf_life_days"] = payload.shelf_life_days
+    if "storage_condition" in products.c and payload.storage_condition is not None:
+        values["storage_condition"] = payload.storage_condition
+    if "origin_country" in products.c and payload.origin_country is not None:
+        values["origin_country"] = payload.origin_country
+    if "brand" in products.c and payload.brand is not None:
+        values["brand"] = payload.brand
+    if "manufacturer" in products.c and payload.manufacturer is not None:
+        values["manufacturer"] = payload.manufacturer
+    if "package_type" in products.c and payload.package_type is not None:
+        values["package_type"] = payload.package_type
+    if "net_weight_grams" in products.c and payload.net_weight_grams is not None:
+        values["net_weight_grams"] = payload.net_weight_grams
+    if "allergens" in products.c and payload.allergens is not None:
+        values["allergens"] = payload.allergens
+    if "certifications" in products.c and payload.certifications is not None:
+        values["certifications"] = payload.certifications
+    if "lead_time_days" in products.c and payload.lead_time_days is not None:
+        values["lead_time_days"] = payload.lead_time_days
     if "unit" in products.c:
         values["unit"] = payload.unit if payload.unit is not None else ""
     if "min_qty" in products.c:
@@ -243,12 +283,33 @@ def update_product(
         raise HTTPException(403, detail="Not allowed")
 
     values: dict = {}
+    provided_fields = set(payload.model_fields_set)
     if payload.category_id is not None and "category_id" in products.c:
         values["category_id"] = payload.category_id
     if payload.name is not None and "name" in products.c:
         values["name"] = payload.name.strip()
-    if payload.description is not None and "description" in products.c:
-        values["description"] = payload.description
+    if "description" in provided_fields and "description" in products.c:
+        values["description"] = payload.description or ""
+    if "shelf_life_days" in provided_fields and "shelf_life_days" in products.c:
+        values["shelf_life_days"] = payload.shelf_life_days
+    if "storage_condition" in provided_fields and "storage_condition" in products.c:
+        values["storage_condition"] = payload.storage_condition
+    if "origin_country" in provided_fields and "origin_country" in products.c:
+        values["origin_country"] = payload.origin_country
+    if "brand" in provided_fields and "brand" in products.c:
+        values["brand"] = payload.brand
+    if "manufacturer" in provided_fields and "manufacturer" in products.c:
+        values["manufacturer"] = payload.manufacturer
+    if "package_type" in provided_fields and "package_type" in products.c:
+        values["package_type"] = payload.package_type
+    if "net_weight_grams" in provided_fields and "net_weight_grams" in products.c:
+        values["net_weight_grams"] = payload.net_weight_grams
+    if "allergens" in provided_fields and "allergens" in products.c:
+        values["allergens"] = payload.allergens
+    if "certifications" in provided_fields and "certifications" in products.c:
+        values["certifications"] = payload.certifications
+    if "lead_time_days" in provided_fields and "lead_time_days" in products.c:
+        values["lead_time_days"] = payload.lead_time_days
     if payload.price is not None and "price" in products.c:
         values["price"] = payload.price
     if payload.unit is not None and "unit" in products.c:
@@ -294,6 +355,3 @@ def delete_product(
         db.rollback()
         raise HTTPException(400, detail=f"Product delete failed. DB says: {e}")
     return None
-
-
-

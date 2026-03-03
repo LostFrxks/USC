@@ -292,3 +292,103 @@ Verification run:
 - frontend: npm run e2e:ci -- e2e/demo-golden.spec.ts -> passed.
 - backend (local with PYTHONPATH workaround): pytest backend/tests/test_state_machine_api.py backend/tests/test_deliveries_api.py -q -> passed.
 [2026-03-02 10:55:33 +06:00] Finalized map follow-up QA: fixed CartScreen coords warning rendering (escaped text issue), stabilized MapPicker init effect to avoid remount flicker, reran frontend lint/tests/build and Playwright golden map payload check (all passed; existing unrelated AnalyticsScreen lint warning remains).
+[2026-03-02 15:02:06 +06:00] Verified notification flow: supplier notifications are real in-app DB events via create_notification_event() (notification_event + notification_user_state), not mock UI stubs; recipients are resolved from company memberships.
+[2026-03-02 15:21:13 +06:00] Implemented product card extra fields end-to-end (description + shelf life + storage + origin).
+- Backend DB schema: added catalog_product columns shelf_life_days, storage_condition, origin_country.
+- Added Alembic migration: backend/alembic/versions/0005_product_extra_fields.py.
+- Products API updated (backend/app/routers/products.py): create/update payloads support new fields; PATCH now respects explicitly provided nullable fields via model_fields_set.
+- Demo seed updated (backend/scripts/seed_demo.py): new product metadata defaults are now populated.
+- Frontend product mapping updated (frontend/src/api/products.ts, frontend/src/types.ts): new fields normalized for marketplace and supplier product models.
+- Product card UI upgraded (frontend/src/ui/ProductCard.tsx + frontend/src/styles/screens.css): now shows description and compact chips (shelf life/storage/origin).
+- Supplier publications flow extended (frontend/src/screens/PublicationsScreen.tsx): create/edit forms now include and save description, shelf life, storage condition, origin country.
+- Added backend test coverage: backend/tests/test_products_extra_fields.py (PATCH/list persistence of new fields).
+- Adjusted CheckoutModal test for lazy map loading stability: frontend/src/ui/CheckoutModal.test.tsx.
+
+Verification:
+- frontend: npm run test:ci -> passed.
+- frontend: npm run build -> passed.
+- frontend: npm run lint -> passed with one pre-existing warning in AnalyticsScreen.
+- backend: PYTHONPATH=. pytest backend/tests/test_products_extra_fields.py -q -> passed.
+[2026-03-02 17:07:00] Task: Product cards extra fields + UI polish
+- Backend: extended catalog_product with brand, manufacturer, package_type, net_weight_grams, allergens, certifications, lead_time_days (schema + alembic 0005 + products router create/update).
+- Backend: expanded seed_demo ensure_product to support new optional product metadata fields.
+- Frontend API/types: wired all new product fields in ProductApi, SupplierProduct, create/update payloads, and normalize mappers.
+- Supplier workspace (PublicationsScreen): added create/edit inputs and save/create logic for all new fields with numeric validation for net weight and lead time.
+- ProductCard UI: redesigned metadata presentation (brand/manufacturer line, labeled fact chips, quality note for certifications/allergens).
+- Tests/verification: backend pytest backend/tests/test_products_extra_fields.py passed; frontend test:ci passed; frontend build passed; frontend lint passed with one pre-existing warning in AnalyticsScreen.
+[2026-03-02 17:54:31] Task: Product details bottom-sheet on frontend
+- Added new UI component ProductDetailsSheet with mobile bottom-sheet layout, smooth open animation, close by backdrop/button/Escape, and Add-to-cart action.
+- Connected detailed product view to HomeScreen, SearchScreen, and SupplierScreen: tapping a product card now opens full details.
+- Updated ProductCard to support optional onOpen behavior with keyboard support and prevented add-button click from triggering detail open.
+- Added styling for interactive product cards and full product details sheet (overlay, media, facts grid, certifications/allergens notes, footer CTA).
+- Validation checks: frontend lint passed (1 pre-existing warning in AnalyticsScreen), frontend test:ci passed, frontend build passed.
+[2026-03-02 18:52:13] Task: LAN IP launch readiness (0.0.0.0 + CORS)
+- Backend CORS moved to env-driven settings (CORS_ALLOW_ORIGINS, CORS_ALLOW_ORIGIN_REGEX) in app.core.config and app.main middleware wiring.
+- Default CORS regex expanded to allow localhost/127.0.0.1 and LAN IPv4 origins with any port, so app works from current local IP URL.
+- Added CORS variables to .env.example, .env.dev.example, .env.prod.example and backend/.env.example.
+- Updated README quick-start with LAN access URL format http://<YOUR_LAN_IP>:5173 and ipconfig instruction.
+- Verification: backend import check passed (rom app.main import app), frontend build passed.
+[2026-03-03 08:29:03] Task: AI chat persistence + improved saved chats UI
+- Upgraded AI chat storage to versioned local payload: stores both sessions and active chat id (PersistedChatState v1).
+- Added safe parser/migration for legacy storage format, session/message coercion, limits (max sessions/messages) and fallback recovery.
+- Added chat management actions in sidebar: rename chat and delete chat.
+- Improved saved chats appearance: title row, message count badge, last-message preview, compact timestamp, action buttons.
+- Added local persistence hint in mobile chat header ("Сохранено локально").
+- Ensured current chat auto-recovers if selected chat was removed/missing.
+- Validation: frontend lint passed (1 pre-existing warning in AnalyticsScreen), frontend test:ci passed, frontend build passed.
+[2026-03-03 08:34:10] Task: Fix broken AI message formatting + improve assistant message design
+- Backend: improved analytics assistant sanitization to strip technical tokens like analytics_modules.* anywhere in a line (not only at line start).
+- Backend: adjusted assistant line sanitizer to trim trailing action-section markers.
+- Frontend AI chat: added stronger text cleanup and parsing (removes technical tokens/markdown, splits summary from inline numbered actions).
+- Frontend AI chat: if structured actions are absent, actions are extracted from assistant text and rendered in dedicated "Что делать" section.
+- Frontend AI chat: reveal animation now targets sanitized summary length to avoid caret/reveal glitches on cleaned text.
+- Frontend AI styles: redesigned assistant bubble and section blocks (better typography, gradient card, clearer section chips, action items as mini-cards).
+- Validation: backend py_compile passed; frontend lint passed with 1 pre-existing warning (AnalyticsScreen hooks deps); frontend tests passed; frontend build passed.
+[2026-03-03 08:37:14] Task: AI actions list visual cleanup
+- Updated AI chat action list styling to remove card-like blocks on each li item.
+- Actions now render as plain text list entries (transparent background, no per-item border/box, standard list markers).
+- Verified frontend build passed after CSS change.
+[2026-03-03 08:44:23] Task: Balanced highlight system for AI messages (numbers/metrics)
+- Added rich-text token highlighting in AI assistant messages with capped density to avoid overload.
+- Highlight parser detects key numeric/metric tokens (percentages, currency values, KPI/status keywords) and applies tone classes: positive, negative, metric.
+- Added inline highlight renderer for summary, causes, and actions blocks (subtle emphasis instead of heavy formatting).
+- Added compact KPI chips for assistant responses based on structured metrics (MoM, Delivery, Cancel rate, Share, Top category).
+- Kept UX balanced via highlight limits per block so long messages remain readable.
+- Validation: frontend lint passed (1 pre-existing warning in AnalyticsScreen), frontend tests passed, frontend build passed.
+[2026-03-03 08:50:36] Task: AI highlight fixes for quotes and numeric ranges
+- Frontend AI text cleanup now removes wrapping quotes around category/status/product words (e.g. "Meat" -> Meat).
+- Frontend highlight token parser updated to treat numeric ranges as one token (e.g. 2-3), preventing split into separate positive/negative tokens.
+- Highlight classifier updated so range tokens are neutral metric tone, not negative.
+- Validation: frontend lint passed with only pre-existing AnalyticsScreen warning.
+
+[2026-03-03 08:59:45] Task: AI numeric/currency formatting in assistant messages
+- Frontend AI cleanup now normalizes numeric tokens: removes trailing .0/,0, keeps meaningful decimals (e.g. 84.05), and normalizes comma decimals to dot in message text.
+- Added money-context enrichment in assistant text: large bare monetary values are rendered with currency suffix 'сом' (while skipping years/percent/unit values).
+- Updated assistant metric chip formatter to up to 2 decimals without trailing zeros (e.g. 40% instead of 40.0%).
+- Validation: frontend lint passed (1 pre-existing warning in AnalyticsScreen), frontend build passed.
+
+[2026-03-03 09:20:29 +06:00] Task: AI chats persisted in DB + Redis-backed session cache
+- Backend: added ai_chat_session and ai_chat_message schema definitions with Alembic migration 0006_ai_chat_persistence.
+- Backend: implemented app/services/ai_chat.py (create/list/append/rename/delete, cache invalidation patterns for analytics chat keys).
+- Backend: extended analytics router with chat APIs: GET/POST /analytics/assistant/chats, PATCH/DELETE /analytics/assistant/chats/{id}.
+- Backend: assistant query + stream now support chat_session_id, auto-create session when missing, persist user/assistant messages, and return chat_session_id in response.
+- Frontend API: added frontend/src/api/aiChat.ts and extended stream/query payloads with chatSessionId in frontend/src/api/analytics.ts.
+- Frontend AI chat screen: added remote chat sync (load sessions/messages from backend), keep local cache fallback, and pass chatSessionId for server persistence.
+- Tests: added backend/tests/test_ai_chat_persistence_api.py (chat CRUD + persistence flow with stubbed analytics summary for SQLite).
+- Verification: pytest (new + assistant tests) passed; frontend lint passed with one pre-existing warning in AnalyticsScreen; frontend build passed; py_compile passed for modified backend modules.
+
+[2026-03-03 09:42:47 +06:00] Task: codex_remote full local setup + phone access runbook
+- Added codex_remote automation scripts: scripts/codex_remote/bootstrap.ps1, setup-lan.ps1, start.ps1, stop.ps1.
+- setup-lan.ps1 now auto-detects current LAN IPv4, updates ops/codex_remote/.env (AUTH_URL, DEVICE_VERIFICATION_URL, CORS_ORIGINS, ANCHOR_APP_CWD, ports).
+- bootstrap.ps1 installs required dependencies (bun installs for root+anchor and py -3 pip install for control-plane) and prepares LAN .env.
+- Added docs/codex_remote.md with full phone connection pipeline, start/stop commands, security conditions, limitations, and troubleshooting.
+- Updated README.md with quick links/commands for codex_remote.
+- Installed bun locally (bun 1.3.10) and verified codex_remote stack works: backend health on :8080 and frontend on :5173; verified stop script terminates codex_remote processes.
+[2026-03-03 09:48:22 +06:00] Task: Remote access options review for codex_remote (anywhere access)
+- Researched current remote-connect options for out-of-LAN access: Tailscale, Cloudflare Tunnel, ZeroTier, Twingate, NetBird, ngrok.
+- Collected practical trade-offs for MVP use (cost, setup complexity, privacy model, public exposure risk, mobile UX).
+- Prepared recommendation baseline: Tailscale (private mesh) as default, Cloudflare Tunnel as public URL fallback.
+[2026-03-03 09:51:53 +06:00] Task: Publish USC updates to GitHub
+- Added guard in bootstrap to auto-clone codex_remote when missing (no vendoring of external repository into USC).
+- Added ops/codex_remote to .gitignore to avoid accidental embedded-repo commits.
+- Updated codex_remote docs accordingly and prepared repository state for clean push to origin/main.

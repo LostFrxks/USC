@@ -32,9 +32,12 @@ describe("CheckoutModal", () => {
 
   it("submits geo tag when coordinates are valid", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    render(<CheckoutModal open total={100} onClose={() => undefined} onSubmit={onSubmit} />);
+    const { container } = render(<CheckoutModal open total={100} onClose={() => undefined} onSubmit={onSubmit} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "pick-on-map" }));
+    const lat = container.querySelectorAll(".coords-row input")[0] as HTMLInputElement;
+    const lng = container.querySelectorAll(".coords-row input")[1] as HTMLInputElement;
+    fireEvent.change(lat, { target: { value: "42.8746" } });
+    fireEvent.change(lng, { target: { value: "74.5698" } });
     fireEvent.click(screen.getByRole("button", { name: "Создать заказ" }));
 
     await waitFor(() => {

@@ -2,6 +2,7 @@
 import type { Category, Product } from "../types";
 import TopHeader from "../ui/TopHeader";
 import { ProductCard, ProductCardSkeleton } from "../ui/ProductCard";
+import ProductDetailsSheet from "../ui/ProductDetailsSheet";
 import { useProducts } from "../hooks/useProducts";
 
 const CATEGORIES: Array<{
@@ -59,6 +60,7 @@ export default function HomeScreen({
 }) {
   const [category, setCategory] = useState<Category>("meat");
   const [query, setQuery] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const categoryId = CATEGORY_TO_ID[category];
   const { products, loading } = useProducts(categoryId, query.trim());
@@ -89,6 +91,10 @@ export default function HomeScreen({
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    if (!active) setSelectedProduct(null);
+  }, [active]);
 
   const filteredProducts = useMemo(() => products ?? [], [products]);
 
@@ -183,10 +189,26 @@ export default function HomeScreen({
           ) : filteredProducts.length === 0 ? (
             <div className="search-empty">Ничего не найдено. Попробуйте другой запрос.</div>
           ) : (
-            filteredProducts.map((p, idx) => <ProductCard key={`${p.id}-${idx}`} product={p} onAdd={() => onAdd(p)} />)
+            filteredProducts.map((p, idx) => (
+              <ProductCard
+                key={`${p.id}-${idx}`}
+                product={p}
+                onAdd={() => onAdd(p)}
+                onOpen={() => setSelectedProduct(p)}
+              />
+            ))
           )}
         </div>
       </div>
+
+      <ProductDetailsSheet
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        onAdd={() => {
+          if (!selectedProduct) return;
+          onAdd(selectedProduct);
+        }}
+      />
     </section>
   );
 }
