@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { createOrder } from "../api/orders";
 import type { ToastTone } from "../hooks/useToast";
 import type { CartItem } from "../types";
@@ -20,6 +20,7 @@ export default function CartScreen({
   cartCount,
   onBurger,
   onCheckoutSuccess,
+  onCheckoutOpenChange,
   buyerCompanyId,
   onNotify,
 }: {
@@ -33,6 +34,7 @@ export default function CartScreen({
   cartCount: number;
   onBurger: () => void;
   onCheckoutSuccess: () => void;
+  onCheckoutOpenChange?: (open: boolean) => void;
   buyerCompanyId?: number | null;
   onNotify: (message: string, tone?: ToastTone) => void;
 }) {
@@ -51,6 +53,11 @@ export default function CartScreen({
   const canSubmitOrder = canCheckout && address.trim().length > 0;
   const coordInputState = useMemo(() => validateLatLngInputs(latInput, lngInput), [latInput, lngInput]);
   const showCoordsWarning = coordInputState.kind === "invalid_number" || coordInputState.kind === "out_of_range";
+
+  useEffect(() => {
+    onCheckoutOpenChange?.(checkoutOpen);
+    return () => onCheckoutOpenChange?.(false);
+  }, [checkoutOpen, onCheckoutOpenChange]);
 
   const syncCoordsFromInputs = (nextLatRaw: string, nextLngRaw: string) => {
     const nextState = validateLatLngInputs(nextLatRaw, nextLngRaw);
@@ -234,6 +241,7 @@ export default function CartScreen({
               <button
                 className="primary-button cart-checkout"
                 data-testid="cart-open-checkout"
+                data-tour-id="cart-open-checkout"
                 type="button"
                 onClick={() => setCheckoutOpen((v) => !v)}
                 disabled={!canCheckout}
@@ -245,7 +253,7 @@ export default function CartScreen({
             </div>
 
             {checkoutOpen && (
-              <section className="checkout-inline">
+              <section className="checkout-inline" data-tour-id="cart-checkout-panel">
                 <div className="checkout-inline-title">{"\u041e\u0444\u043e\u0440\u043c\u043b\u0435\u043d\u0438\u0435 \u0437\u0430\u043a\u0430\u0437\u0430"}</div>
 
                 <label className="field">

@@ -16,6 +16,9 @@ import AboutScreen from "./screens/AboutScreen";
 import HelpScreen from "./screens/HelpScreen";
 import FaqScreen from "./screens/FaqScreen";
 import AIChatScreen from "./screens/AIChatScreen";
+import OnboardingOverlay from "./onboarding/OnboardingOverlay";
+import { ONBOARDING_STEPS } from "./onboarding/steps";
+import { useOnboarding } from "./onboarding/useOnboarding";
 import TabBar, { type TabKey } from "./ui/TabBar";
 import { Toast } from "./ui/Toast";
 import { Drawer } from "./ui/Drawer";
@@ -69,6 +72,8 @@ export default function App() {
   const [focusOrderId, setFocusOrderId] = useState<number | null>(null);
   const [supplierView, setSupplierView] = useState<{ id: string; name: string } | null>(null);
   const [searchPreset, setSearchPreset] = useState<{ categoryId: number | null }>({ categoryId: null });
+  const [cartCheckoutOpen, setCartCheckoutOpen] = useState(false);
+  const [tourTargetFound, setTourTargetFound] = useState(false);
 
   const [splashAnimationDone, setSplashAnimationDone] = useState(!initialAuthed);
   const handleSessionExpired = useCallback(() => {
@@ -251,6 +256,50 @@ export default function App() {
     setAppRole(companyBasedRole ?? savedRole ?? normalizeRole(profile.role));
   }, [profile, currentCompanyType]);
 
+  const keepSplashVisible = authed && (!splashAnimationDone || profileLoading);
+  const onboardingContext = useMemo(() => {
+    if (!profile || companyId == null) return null;
+    const userId = Number(profile.id);
+    if (!Number.isFinite(userId) || userId <= 0) return null;
+    return {
+      userId,
+      companyId: Number(companyId),
+      role: appRole,
+    };
+  }, [appRole, companyId, profile]);
+
+  const onboardingEnabled =
+    authed &&
+    !!profile &&
+    companyId != null &&
+    !profileLoading &&
+    !companyPickerOpen &&
+    !profileError &&
+    !keepSplashVisible;
+
+  const onboarding = useOnboarding({
+    enabled: onboardingEnabled,
+    context: onboardingContext,
+    stepsCount: ONBOARDING_STEPS.length,
+  });
+
+  const onboardingStep = onboarding.isRunning ? ONBOARDING_STEPS[onboarding.stepIndex] ?? null : null;
+
+  const onboardingStepCompleted = useMemo(() => {
+    if (!onboardingStep) return false;
+    if (onboardingStep.mode !== "interaction_required") return true;
+    if (onboardingStep.id === "open_drawer") return drawerOpen;
+    if (onboardingStep.id === "cart_checkout") return activeTab === "cart" && cartCheckoutOpen;
+    return false;
+  }, [activeTab, cartCheckoutOpen, drawerOpen, onboardingStep]);
+
+  const onboardingCanGoNext = useMemo(() => {
+    if (!onboardingStep) return false;
+    if (onboardingStep.mode !== "interaction_required") return true;
+    const targetMissing = !!onboardingStep.targetSelector && !tourTargetFound;
+    return onboardingStepCompleted || targetMissing;
+  }, [onboardingStep, onboardingStepCompleted, tourTargetFound]);
+
   function addToCart(product: Product) {
     cart.add(product);
   }
@@ -268,7 +317,7 @@ export default function App() {
   }
 
   const openDrawer = () => setDrawerOpen(true);
-  const closeDrawer = () => setDrawerOpen(false);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
   const handleLogout = async () => {
     await clearAuth().catch(() => undefined);
     handleSessionExpired();
@@ -287,7 +336,7 @@ export default function App() {
     setCompanyPickerOpen(true);
   };
 
-  const goTab = (tab: TabKey) => {
+  const goTab = useCallback((tab: TabKey) => {
     setOrdersOpen(false);
     setFocusOrderId(null);
     setSupplierView(null);
@@ -303,7 +352,22 @@ export default function App() {
     setActiveTab(tab);
     if (tab === "search") setSearchPreset({ categoryId: null });
     closeDrawer();
-  };
+  }, [activeTab, closeDrawer]);
+
+  useEffect(() => {
+    setTourTargetFound(false);
+  }, [onboardingStep?.id]);
+
+  useEffect(() => {
+    if (!onboarding.isRunning || !onboardingStep) return;
+    if (onboardingStep.screen && activeTab !== onboardingStep.screen) {
+      goTab(onboardingStep.screen);
+      return;
+    }
+    if (onboardingStep.id !== "open_drawer" && drawerOpen) {
+      closeDrawer();
+    }
+  }, [activeTab, closeDrawer, drawerOpen, goTab, onboarding.isRunning, onboardingStep]);
 
   const openFilters = () => {
     // Filters panel is not implemented yet.
@@ -354,7 +418,6 @@ export default function App() {
   };
 
   const screensLocked = !!supplierView || ordersOpen || !!drawerScreen;
-  const keepSplashVisible = authed && (!splashAnimationDone || profileLoading);
   const screensClassName = `screens ${!screensLocked ? `tab-transition-${tabTransitionDir}` : ""}`.trim();
 
   if (!authed) {
@@ -469,6 +532,7 @@ export default function App() {
           cartCount={cart.count}
           onBurger={openDrawer}
           onCheckoutSuccess={openOrders}
+          onCheckoutOpenChange={setCartCheckoutOpen}
           buyerCompanyId={companyId}
           onNotify={toast.show}
         />
@@ -564,6 +628,8 @@ export default function App() {
           onBurger={openDrawer}
           onOpenNotifications={() => openDrawerScreen("notifications")}
           notificationCount={notificationCount}
+          onboardingReplayRequested={onboarding.replayRequested}
+          onRequestOnboardingReplay={onboarding.requestReplay}
         />
 
         <HelpScreen
@@ -582,6 +648,18 @@ export default function App() {
       </main>
 
       <TabBar active={activeTab} cartCount={cart.count} onChange={goTab} />
+      <OnboardingOverlay
+        visible={onboarding.isRunning}
+        step={onboardingStep}
+        stepIndex={onboarding.stepIndex}
+        totalSteps={ONBOARDING_STEPS.length}
+        canGoNext={onboardingCanGoNext}
+        onBack={onboarding.back}
+        onNext={onboarding.next}
+        onSkip={onboarding.skip}
+        onFinish={onboarding.finish}
+        onTargetFoundChange={setTourTargetFound}
+      />
       <Toast text={toast.text} tone={toast.tone} visible={toast.visible} onClose={toast.hide} />
 
       {companyPickerOpen && profile ? (

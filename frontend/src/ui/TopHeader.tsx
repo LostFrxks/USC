@@ -12,7 +12,7 @@ export default function TopHeader({
 
   return (
     <header className="topbar">
-      <button className="burger" onClick={onBurger} type="button" aria-label="Меню">
+      <button className="burger" data-tour-id="top-burger" onClick={onBurger} type="button" aria-label="Меню">
         <span className="burger-line" />
         <span className="burger-line" />
         <span className="burger-line" />

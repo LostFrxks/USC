@@ -223,6 +223,20 @@ test("demo golden path: login -> home -> analytics -> ai -> create order -> orde
     localStorage.clear();
     localStorage.setItem("usc_access_token", "access-token");
     localStorage.setItem("usc_refresh_token", "refresh-token");
+    localStorage.setItem("usc_company_id", "10");
+    localStorage.setItem("usc_company_name", "Demo Buyer Co");
+    localStorage.setItem("usc_app_role", "buyer");
+    localStorage.setItem(
+      "usc.onboarding.v1.state.1.10.buyer",
+      JSON.stringify({
+        status: "completed",
+        stepIndex: 7,
+        lastUpdatedAt: Date.now(),
+        engineVersion: "1.0.0",
+        storageSchemaVersion: 1,
+        guideContentVersion: "1.0.0",
+      })
+    );
   });
   await page.reload();
 

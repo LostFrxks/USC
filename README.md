@@ -30,6 +30,66 @@ Use base + prod override:
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
+## Mentor testing profile (Netlify frontend + public backend)
+
+This profile keeps your current local `dev` flow unchanged and adds a separate public setup for mentor access.
+
+### 1) Run backend stack on a public host
+
+On the backend host:
+
+```powershell
+copy .env.mentor.example .env
+```
+
+Fill real values in `.env`:
+- `JWT_SECRET_KEY`
+- `CORS_ALLOW_ORIGINS` with your Netlify URL
+- `CORS_ALLOW_ORIGIN_REGEX` with your Netlify site pattern
+
+Start only backend dependencies + API:
+
+```powershell
+docker compose up -d --build postgres redis backend
+```
+
+Health check:
+
+```powershell
+curl http://<BACKEND_PUBLIC_HOST>:8000/api/health
+```
+
+### 2) Seed demo data once
+
+```powershell
+docker exec -w /app usc-backend python scripts/seed_demo.py
+```
+
+### 3) Deploy frontend to Netlify
+
+Repo already includes `netlify.toml`:
+- base: `frontend`
+- build: `npm ci && npm run build`
+- publish: `dist`
+
+In Netlify project settings, set required environment variable:
+
+- `VITE_API_BASE=https://<BACKEND_PUBLIC_HOST>/api`
+
+Optional:
+- `VITE_MAP_STYLE_URL`, `VITE_MAP_DEFAULT_LAT`, `VITE_MAP_DEFAULT_LNG`, `VITE_MAP_DEFAULT_ZOOM`
+- `VITE_SENTRY_*`
+
+### 4) Verify mentor URL
+
+Open Netlify URL and test:
+1. login with demo account
+2. products/orders/analytics
+3. AI screen
+4. order create flow
+
+Important: Netlify hosts only frontend. PostgreSQL/Redis/FastAPI must stay on your backend host.
+
 ### With observability stack (optional)
 
 Add `--profile observability` to include Prometheus (and Grafana in dev):

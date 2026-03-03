@@ -179,7 +179,7 @@ export default function HomeScreen({
 
         <div className="premium-banner">USC Премиум</div>
 
-        <div className="product-grid" id="product-grid" data-testid="home-product-grid">
+        <div className="product-grid" id="product-grid" data-testid="home-product-grid" data-tour-id="home-product-grid">
           {loading ? (
             <>
               {Array.from({ length: 6 }).map((_, i) => (

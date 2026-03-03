@@ -35,6 +35,16 @@ from app.services.ai_chat import (
     list_chat_sessions,
     rename_chat_session,
 )
+from app.services.what_if import (
+    create_what_if_scenario,
+    delete_what_if_scenario,
+    list_what_if_scenarios,
+    normalize_horizon_days,
+    normalize_levers,
+    normalize_role as normalize_what_if_role,
+    rename_what_if_scenario,
+    simulate_what_if,
+)
 
 router = APIRouter(tags=["analytics"])
 
@@ -59,6 +69,30 @@ class AnalyticsChatCreateRequest(BaseModel):
 
 
 class AnalyticsChatRenameRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=120)
+
+
+class AnalyticsWhatIfRequest(BaseModel):
+    company_id: int = Field(..., ge=1)
+    role: str = Field(default="supplier")
+    days: int = Field(default=365, ge=7, le=3650)
+    horizon_days: int = Field(default=30)
+    selected_month: str | None = Field(default=None, max_length=7)
+    drilldown_by: str = Field(default="category")
+    levers: dict = Field(default_factory=dict)
+
+
+class AnalyticsWhatIfScenarioCreateRequest(BaseModel):
+    company_id: int = Field(..., ge=1)
+    role: str = Field(default="supplier")
+    title: str | None = Field(default=None, max_length=120)
+    horizon_days: int = Field(default=30)
+    selected_month: str | None = Field(default=None, max_length=7)
+    levers: dict = Field(default_factory=dict)
+    result: dict | None = Field(default=None)
+
+
+class AnalyticsWhatIfScenarioRenameRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=120)
 
 
@@ -159,7 +193,7 @@ def _assistant_answer(summary: dict, question: str, selected_month: str | None) 
 
     if top_cat_share >= 55:
         raw_causes.append(
-            f"Выручка сильно сконцентрирована в категории «{top_cat_name}» ({top_cat_share:.1f}%)."
+            f"Выручка сильно сконцентрирована в категории {top_cat_name} ({top_cat_share:.1f}%)."
         )
         raw_actions.append("Диверсифицировать ассортимент: добавить 2-3 SKU из второй по доле категории.")
 
@@ -235,14 +269,14 @@ def _assistant_answer(summary: dict, question: str, selected_month: str | None) 
     if wants_actions and not raw_actions:
         raw_actions.append("Поддерживайте текущую стратегию и мониторьте ключевые KPI ежедневно.")
 
-    probable_causes: list[str] = raw_causes[:4] if wants_causes else []
-    actions: list[str] = raw_actions[:5] if wants_actions else []
+    probable_causes: list[str] = _sanitize_assistant_list(raw_causes[:4] if wants_causes else [], limit=4)
+    actions: list[str] = _sanitize_assistant_list(raw_actions[:5] if wants_actions else [], limit=5)
 
     signal_count = len(raw_causes)
     confidence = min(0.95, max(0.55, 0.55 + signal_count * 0.07))
 
     return {
-        "summary": summary_text,
+        "summary": _sanitize_assistant_line(summary_text),
         "probable_causes": probable_causes[:4],
         "actions": actions[:5],
         "confidence": round(confidence, 2),
@@ -267,6 +301,8 @@ def _safe_float(value, default: float = 0.0) -> float:
 
 
 _TECH_PREFIX_RE = re.compile(r"(?:\d+\.\s*)?analytics_modules\.[\w.]+:\s*", flags=re.IGNORECASE)
+_TECH_TOKEN_RE = re.compile(r"\banalytics_modules(?:\.[\w-]+)+:?", flags=re.IGNORECASE)
+_QUOTED_TOKEN_RE = re.compile(r'[«"“”]\s*([A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9 _/\-]{0,40})\s*[»"“”]')
 
 
 def _sanitize_assistant_line(text: str) -> str:
@@ -274,8 +310,15 @@ def _sanitize_assistant_line(text: str) -> str:
     if not clean:
         return ""
     clean = _TECH_PREFIX_RE.sub("", clean)
+    clean = _TECH_TOKEN_RE.sub("", clean)
+    clean = _QUOTED_TOKEN_RE.sub(lambda m: m.group(1).strip(), clean)
     clean = re.sub(r"\s+(?:вот что можно сделать|что делать|практические шаги)\s*:\s*$", "", clean, flags=re.IGNORECASE)
+    clean = re.sub(r"\(\s*\)", "", clean)
+    clean = re.sub(r"\s+([,.;:!?])", r"\1", clean)
+    clean = re.sub(r"([(\[])\s+", r"\1", clean)
+    clean = re.sub(r"\s+([)\]])", r"\1", clean)
     clean = re.sub(r"\s{2,}", " ", clean).strip()
+    clean = clean.strip(" ,;:-")
     return clean
 
 
@@ -293,6 +336,25 @@ def _sanitize_assistant_list(values: list[str], *, limit: int) -> list[str]:
         out.append(clean)
         if len(out) >= limit:
             break
+    return out
+
+
+def _sanitize_assistant_payload(payload: dict) -> dict:
+    out = dict(payload or {})
+    out["summary"] = _sanitize_assistant_line(str(out.get("summary") or ""))
+    out["probable_causes"] = _sanitize_assistant_list(
+        [str(x) for x in (out.get("probable_causes") or [])],
+        limit=4,
+    )
+    out["actions"] = _sanitize_assistant_list(
+        [str(x) for x in (out.get("actions") or [])],
+        limit=5,
+    )
+    metrics = out.get("metrics")
+    if isinstance(metrics, dict):
+        top_name = _sanitize_assistant_line(str(metrics.get("top_category_name") or ""))
+        metrics["top_category_name"] = top_name or "—"
+        out["metrics"] = metrics
     return out
 
 
@@ -519,6 +581,9 @@ def _llm_assistant_answer(
         "If data is insufficient, say so explicitly and avoid invented facts. "
         "Use actor_context for personalization when relevant. "
         "If buyer_recommendations are present, include concrete supplier/product suggestions from them in actions. "
+        "Never output technical keys like analytics_modules.* in user-facing text. "
+        "Do not wrap simple category/status names in quotes. "
+        "Use 'сом' as currency label when mentioning money values in this product context. "
         "If input is abusive/sexual/illegal-harmful, refuse with exactly: "
         "'Этот запрос нарушает условия пользования. Пожалуйста, переформулируйте вопрос.' "
         "and set probable_causes/actions empty and show_metrics=false. "
@@ -557,13 +622,10 @@ def _llm_assistant_answer(
         if not isinstance(out, dict):
             return None
         metrics = out.get("metrics") or {}
-        summary_text = _sanitize_assistant_line(str(out.get("summary") or ""))
-        probable_causes = _sanitize_assistant_list([str(x) for x in (out.get("probable_causes") or [])], limit=4)
-        actions = _sanitize_assistant_list([str(x) for x in (out.get("actions") or [])], limit=5)
-        return {
-            "summary": summary_text,
-            "probable_causes": probable_causes,
-            "actions": actions,
+        normalized = {
+            "summary": str(out.get("summary") or ""),
+            "probable_causes": [str(x) for x in (out.get("probable_causes") or [])],
+            "actions": [str(x) for x in (out.get("actions") or [])],
             "confidence": max(0.0, min(1.0, _safe_float(out.get("confidence"), 0.7))),
             "focus_month": out.get("focus_month"),
             "show_metrics": bool(out.get("show_metrics", True)),
@@ -576,6 +638,7 @@ def _llm_assistant_answer(
                 "top_category_share_pct": _safe_float(metrics.get("top_category_share_pct")),
             },
         }
+        return _sanitize_assistant_payload(normalized)
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, ValueError, TypeError):
         return None
 
@@ -1618,6 +1681,49 @@ def _analytics_assistant_cache_key(
     )
 
 
+def _analytics_what_if_simulate_cache_key(
+    *,
+    user_id: int,
+    company_id: int,
+    role: str,
+    days: int,
+    horizon_days: int,
+    selected_month: str | None,
+    drilldown_by: str,
+    levers: dict[str, float],
+) -> str:
+    payload = json.dumps(
+        {
+            "days": int(days),
+            "horizon_days": int(horizon_days),
+            "selected_month": selected_month or "_",
+            "drilldown_by": drilldown_by,
+            "levers": levers,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return make_key(
+        "analytics_what_if",
+        "simulate",
+        user_id,
+        company_id,
+        role,
+        stable_hash(payload, 24),
+    )
+
+
+def _analytics_what_if_list_cache_key(
+    *,
+    user_id: int,
+    company_id: int,
+    role: str,
+    limit: int,
+) -> str:
+    return make_key("analytics_what_if", "list", user_id, company_id, role, limit)
+
+
 def _ndjson_event(payload: dict) -> str:
     return json.dumps(payload, ensure_ascii=False) + "\n"
 
@@ -1660,6 +1766,9 @@ async def _llm_stream_text(
         "Отвечай ТОЛЬКО на русском, коротко и по делу, опираясь на цифры из контекста. "
         "Если вопрос про аналитику/бизнес, дай понятный вывод и 2-4 практичных шага по приоритету. "
         "Если есть analytics_modules.actions/alerts, используй их первыми и упоминай ожидаемый эффект. "
+        "Никогда не показывай пользователю технические ключи вида analytics_modules.*. "
+        "Не оборачивай простые названия категорий/статусов в кавычки. "
+        "Денежные суммы указывай в сом. "
         "Не возвращай JSON, markdown или служебный текст. Только готовый человеко-понятный ответ."
     )
     payload = {
@@ -1949,6 +2058,179 @@ def analytics_summary(
     return response
 
 
+@router.post("/analytics/what-if")
+def analytics_what_if(
+    payload: AnalyticsWhatIfRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    u_id = int(user["id"])
+    role_norm = normalize_what_if_role(payload.role)
+    if int(payload.company_id) not in _company_ids_for_user(db, u_id):
+        raise HTTPException(403, detail="Not allowed")
+
+    horizon_days = normalize_horizon_days(payload.horizon_days)
+    incoming_levers = payload.levers if isinstance(payload.levers, dict) else {}
+    levers = normalize_levers(role_norm, incoming_levers)
+    drilldown_by = "sku" if str(payload.drilldown_by or "").strip().lower() == "sku" else "category"
+    selected_month = (payload.selected_month or "").strip() or None
+
+    cache_key = _analytics_what_if_simulate_cache_key(
+        user_id=u_id,
+        company_id=int(payload.company_id),
+        role=role_norm,
+        days=int(payload.days),
+        horizon_days=horizon_days,
+        selected_month=selected_month,
+        drilldown_by=drilldown_by,
+        levers=levers,
+    )
+    cached = get_json(cache_key)
+    if isinstance(cached, dict):
+        return cached
+
+    summary = analytics_summary(
+        company_id=int(payload.company_id),
+        role=role_norm,
+        days=int(payload.days),
+        user=user,
+        db=db,
+    )
+    result = simulate_what_if(
+        summary=summary,
+        role=role_norm,
+        horizon_days=horizon_days,
+        levers=levers,
+        selected_month=selected_month,
+        drilldown_by=drilldown_by,
+    )
+    set_json(cache_key, result, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
+    return result
+
+
+@router.get("/analytics/what-if/scenarios")
+def analytics_what_if_scenarios(
+    company_id: int = Query(..., ge=1),
+    role: str = Query("supplier"),
+    limit: int = Query(30, ge=1, le=100),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    u_id = int(user["id"])
+    role_norm = normalize_what_if_role(role)
+    if int(company_id) not in _company_ids_for_user(db, u_id):
+        raise HTTPException(403, detail="Not allowed")
+
+    cache_key = _analytics_what_if_list_cache_key(
+        user_id=u_id,
+        company_id=int(company_id),
+        role=role_norm,
+        limit=int(limit),
+    )
+    cached = get_json(cache_key)
+    if isinstance(cached, dict) and isinstance(cached.get("items"), list):
+        return cached
+
+    items = list_what_if_scenarios(
+        db,
+        user_id=u_id,
+        company_id=int(company_id),
+        role=role_norm,
+        limit=int(limit),
+    )
+    payload_out = {"items": items}
+    set_json(cache_key, payload_out, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
+    return payload_out
+
+
+@router.post("/analytics/what-if/scenarios")
+def analytics_what_if_scenario_create(
+    payload: AnalyticsWhatIfScenarioCreateRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    u_id = int(user["id"])
+    role_norm = normalize_what_if_role(payload.role)
+    if int(payload.company_id) not in _company_ids_for_user(db, u_id):
+        raise HTTPException(403, detail="Not allowed")
+
+    levers = normalize_levers(role_norm, payload.levers if isinstance(payload.levers, dict) else {})
+    created = create_what_if_scenario(
+        db,
+        user_id=u_id,
+        company_id=int(payload.company_id),
+        role=role_norm,
+        title=payload.title,
+        horizon_days=normalize_horizon_days(payload.horizon_days),
+        selected_month=(payload.selected_month or "").strip() or None,
+        levers=levers,
+        result=payload.result if isinstance(payload.result, dict) else None,
+    )
+    db.commit()
+    try:
+        parsed_levers = json.loads(str(created.get("levers_json") or "{}"))
+    except Exception:
+        parsed_levers = {}
+    parsed_result = None
+    raw_result = created.get("result_json")
+    if isinstance(raw_result, str) and raw_result.strip():
+        try:
+            parsed_result = json.loads(raw_result)
+        except Exception:
+            parsed_result = None
+    return {
+        "id": int(created["id"]),
+        "title": str(created.get("title") or "Сценарий What-if"),
+        "role": str(created.get("role") or role_norm),
+        "horizon_days": int(created.get("horizon_days") or 30),
+        "selected_month": created.get("selected_month"),
+        "levers": parsed_levers,
+        "result": parsed_result,
+        "created_at": created.get("created_at"),
+        "updated_at": created.get("updated_at"),
+    }
+
+
+@router.patch("/analytics/what-if/scenarios/{scenario_id}")
+def analytics_what_if_scenario_rename(
+    scenario_id: int,
+    payload: AnalyticsWhatIfScenarioRenameRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if int(scenario_id) <= 0:
+        raise HTTPException(400, detail="scenario_id must be positive")
+    changed = rename_what_if_scenario(
+        db,
+        scenario_id=int(scenario_id),
+        user_id=int(user["id"]),
+        title=payload.title,
+    )
+    if not changed:
+        raise HTTPException(404, detail="Scenario not found")
+    db.commit()
+    return {"id": int(scenario_id), "title": payload.title.strip(), "updated": True}
+
+
+@router.delete("/analytics/what-if/scenarios/{scenario_id}")
+def analytics_what_if_scenario_delete(
+    scenario_id: int,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if int(scenario_id) <= 0:
+        raise HTTPException(400, detail="scenario_id must be positive")
+    deleted = delete_what_if_scenario(
+        db,
+        scenario_id=int(scenario_id),
+        user_id=int(user["id"]),
+    )
+    if not deleted:
+        raise HTTPException(404, detail="Scenario not found")
+    db.commit()
+    return {"deleted": True}
+
+
 @router.get("/analytics/assistant/chats")
 def analytics_assistant_chats(
     company_id: int = Query(..., ge=1),
@@ -2099,7 +2381,7 @@ def analytics_assistant_query(
     )
     cached_answer = get_json(assistant_cache_key)
     if isinstance(cached_answer, dict):
-        out_cached = dict(cached_answer)
+        out_cached = _sanitize_assistant_payload(dict(cached_answer))
         out_cached["chat_session_id"] = chat_session_id
         _persist_chat_turn(
             db=db,
@@ -2143,6 +2425,7 @@ def analytics_assistant_query(
                 if not llm.get("summary"):
                     llm["summary"] = fallback.get("summary", "")
                 llm["show_metrics"] = bool(llm.get("show_metrics", True))
+        llm = _sanitize_assistant_payload(llm)
         set_json(assistant_cache_key, llm, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
         llm["chat_session_id"] = chat_session_id
         _persist_chat_turn(
@@ -2155,6 +2438,7 @@ def analytics_assistant_query(
         db.commit()
         return llm
     fallback = _assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
+    fallback = _sanitize_assistant_payload(fallback)
     set_json(assistant_cache_key, fallback, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
     fallback["chat_session_id"] = chat_session_id
     _persist_chat_turn(
@@ -2200,7 +2484,7 @@ async def analytics_assistant_query_stream(
     cached_answer = get_json(assistant_cache_key)
 
     async def stream_from_cached(answer: dict) -> AsyncIterator[str]:
-        out_cached = dict(answer)
+        out_cached = _sanitize_assistant_payload(dict(answer))
         out_cached["chat_session_id"] = chat_session_id
         _persist_chat_turn(
             db=db,
@@ -2278,6 +2562,7 @@ async def analytics_assistant_query_stream(
         if yielded_any and streamed_text.strip():
             out = _assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
             out["summary"] = _sanitize_assistant_line(streamed_text.strip())
+            out = _sanitize_assistant_payload(out)
             out["chat_session_id"] = chat_session_id
             set_json(assistant_cache_key, out, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
             _persist_chat_turn(
@@ -2292,6 +2577,7 @@ async def analytics_assistant_query_stream(
             return
 
         fallback = _assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
+        fallback = _sanitize_assistant_payload(fallback)
         fallback["chat_session_id"] = chat_session_id
         set_json(assistant_cache_key, fallback, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
         _persist_chat_turn(

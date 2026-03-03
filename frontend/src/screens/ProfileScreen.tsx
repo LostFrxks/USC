@@ -102,7 +102,12 @@ export default function ProfileScreen({
         </div>
 
         <div className="profilev2-actions">
-          <button className="profilev2-action-btn profilev2-action-primary" type="button" onClick={onSwitchCompany}>
+          <button
+            className="profilev2-action-btn profilev2-action-primary"
+            data-tour-id="profile-switch-company"
+            type="button"
+            onClick={onSwitchCompany}
+          >
             Сменить компанию
           </button>
         </div>

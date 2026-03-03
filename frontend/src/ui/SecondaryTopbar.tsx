@@ -14,7 +14,7 @@ export default function SecondaryTopbar({
 
   return (
     <header className="topbar topbar-secondary">
-      <button className="burger" onClick={onBurger} type="button" aria-label="Меню">
+      <button className="burger" data-tour-id="top-burger" onClick={onBurger} type="button" aria-label="Меню">
         <span className="burger-line" />
         <span className="burger-line" />
         <span className="burger-line" />
@@ -25,10 +25,17 @@ export default function SecondaryTopbar({
         {resolvedAddress} <span className="address-arrow">▼</span>
       </div>
 
-      <button className="icon-button notification-button" data-testid="open-notifications" type="button" onClick={onNotifications} aria-label="�����������">
+      <button
+        className="icon-button notification-button"
+        data-testid="open-notifications"
+        type="button"
+        onClick={onNotifications}
+        aria-label="Уведомления"
+      >
         <img src="/media/notifications.png" alt="Уведомления" />
         <span className={`icon-badge ${notificationCount > 0 ? "show" : ""}`}>{notificationCount > 0 ? notificationCount : ""}</span>
       </button>
     </header>
   );
 }
+

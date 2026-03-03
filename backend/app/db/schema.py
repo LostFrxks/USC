@@ -237,3 +237,21 @@ ai_chat_message = Table(
     Column("payload_json", Text, nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
 )
+
+
+# --- AI what-if scenarios ---
+ai_what_if_scenario = Table(
+    "ai_what_if_scenario",
+    metadata,
+    Column("id", BigInteger, primary_key=True),
+    Column("user_id", BigInteger, ForeignKey("accounts_user.id", ondelete="CASCADE"), nullable=False),
+    Column("company_id", BigInteger, ForeignKey("companies_company.id", ondelete="CASCADE"), nullable=False),
+    Column("role", String(20), nullable=False),
+    Column("title", String(120), nullable=False),
+    Column("horizon_days", BigInteger, nullable=False),
+    Column("selected_month", String(7), nullable=True),
+    Column("levers_json", Text, nullable=False),
+    Column("result_json", Text, nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)

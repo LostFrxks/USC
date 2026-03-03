@@ -45,6 +45,7 @@ export default function TabBar({
           key={t.key}
           className={`tab ${active === t.key ? "active" : ""}`}
           data-testid={`tab-${t.key}`}
+          data-tour-id={`tab-${t.key}`}
           type="button"
           onClick={() => onChange(t.key)}
         >

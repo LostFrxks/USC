@@ -3,6 +3,7 @@ import TopHeader from "../ui/TopHeader";
 import { streamAnalyticsAssistant, type AnalyticsAssistantResponse } from "../api/analytics";
 import { fetchAiChatSessions, type AiChatSessionDto } from "../api/aiChat";
 import { AI_TEXT } from "../constants/aiTexts";
+import WhatIfStudio from "../ui/ai/WhatIfStudio";
 
 type ChatMessage = {
   id: string;
@@ -26,6 +27,8 @@ type ChatSession = {
 const QUICK_PROMPTS = AI_TEXT.quickPrompts;
 const MAX_SESSIONS = 60;
 const MAX_MESSAGES_PER_SESSION = 180;
+const TECH_TOKEN_RE = /\banalytics_modules(?:\.[\w-]+)+:?/gi;
+const QUOTED_TOKEN_RE = /[«"“”]\s*([A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9 _/-]{0,40})\s*[»"“”]/g;
 
 function sessionKey(companyId: number | null | undefined, role: string | null | undefined) {
   return `usc.ai.sessions.${companyId ?? "none"}.${(role ?? "unknown").toLowerCase()}`;
@@ -42,7 +45,7 @@ function makeTitle(text: string) {
 }
 
 function sanitizeAssistantSummary(text: string): string {
-  const clean = (text || "").replace(/\*\*/g, "").trim();
+  const clean = sanitizeAssistantLine(text);
   if (!clean) return "";
   const lines = clean.split("\n");
   const sectionMarkers = [
@@ -62,6 +65,36 @@ function sanitizeAssistantSummary(text: string): string {
   }
   const summary = lines.slice(0, cutoff).join("\n").trim();
   return summary || clean;
+}
+
+function sanitizeAssistantLine(text: string): string {
+  const clean = (text || "")
+    .replace(/\*\*/g, "")
+    .replace(TECH_TOKEN_RE, "")
+    .replace(QUOTED_TOKEN_RE, "$1")
+    .replace(/\s+(вот что можно сделать|что делать|практические шаги)\s*:\s*$/i, "")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/\(\s*\)/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .replace(/^[,;:\- ]+|[,;:\- ]+$/g, "");
+  return clean;
+}
+
+function sanitizeAssistantList(values: unknown, limit: number): string[] {
+  if (!Array.isArray(values)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const clean = sanitizeAssistantLine(String(value || ""));
+    if (!clean) continue;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(clean);
+    if (out.length >= limit) break;
+  }
+  return out;
 }
 
 function mapRemoteSession(remote: AiChatSessionDto): ChatSession {
@@ -469,141 +502,153 @@ export default function AIChatScreen({
         />
       ) : null}
 
-      <div className="ai-layout">
-        <aside className={`ai-sidebar ${mobileSidebarOpen ? "mobile-open" : ""}`}>
-          <div className="ai-sidebar-mobile-head">
-            <button
-              type="button"
-              className="ai-sidebar-close"
-              onClick={() => setMobileSidebarOpen(false)}
-              aria-label="Закрыть список чатов"
-            >
-              ×
-            </button>
-          </div>
-          <button type="button" className="ai-new-chat" onClick={newChat}>
-            + Новый чат
-          </button>
-          <div className="ai-sessions">
-            {sessions.length ? (
-              sessions.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  className={`ai-session-item ${s.id === currentId ? "active" : ""}`}
-                  onClick={() => {
-                    setCurrentId(s.id);
-                    setMobileSidebarOpen(false);
-                  }}
-                >
-                  <div className="ai-session-title">{s.title}</div>
-                  <div className="ai-session-meta">{new Date(s.updatedAt).toLocaleString("ru-RU")}</div>
-                </button>
-              ))
-            ) : (
-              <div className="ai-session-empty">Пока нет диалогов</div>
-            )}
-          </div>
-        </aside>
-
-        <div className="ai-chat">
-          <div className="ai-chat-mobile-head">
-            <button
-              type="button"
-              className="ai-mobile-sidebar-toggle"
-              onClick={() => setMobileSidebarOpen(true)}
-              aria-label="Открыть список чатов"
-            >
-              <span />
-              <span />
-              <span />
-            </button>
-            <div className="ai-mobile-chat-title">{currentSession?.title ?? "AI-чат"}</div>
-          </div>
-          <div className="ai-quick-row">
-            {QUICK_PROMPTS.map((q) => (
-              <button key={q} type="button" className="ai-quick-btn" onClick={() => void sendMessage(q)} disabled={!companyId || loading}>
-                {q}
+      <div className="ai-main-scroll">
+        <div className="ai-layout">
+          <aside className={`ai-sidebar ${mobileSidebarOpen ? "mobile-open" : ""}`}>
+            <div className="ai-sidebar-mobile-head">
+              <button
+                type="button"
+                className="ai-sidebar-close"
+                onClick={() => setMobileSidebarOpen(false)}
+                aria-label="Закрыть список чатов"
+              >
+                ×
               </button>
-            ))}
-          </div>
-          <div className="ai-history" ref={historyRef}>
-            {currentSession?.messages.length ? (
-              currentSession.messages.map((m) => {
-                const showCauses = m.role === "assistant" && !!m.data?.probable_causes?.length;
-                const showActions = m.role === "assistant" && !!m.data?.actions?.length;
-                const assistantText = m.role === "assistant" ? sanitizeAssistantSummary(m.text) : m.text;
-                return (
-                <div key={m.id} className={`ai-msg ${m.role} ${m.id === streamingAssistantId ? "is-streaming" : ""}`}>
-                  <div className={`ai-msg-text ${m.role === "assistant" && (revealedCharsByMsgId[m.id] ?? 0) < m.text.length ? "revealing" : ""}`}>
-                    {m.id === streamingAssistantId && !m.text ? (
-                      <span className="ai-typing"><span /><span /><span /></span>
-                    ) : (
-                      <>
-                        {m.role === "assistant"
-                          ? assistantText.slice(0, Math.min(revealedCharsByMsgId[m.id] ?? 0, assistantText.length))
-                          : m.text}
-                        {m.role === "assistant" && (revealedCharsByMsgId[m.id] ?? 0) < m.text.length ? (
-                          <span className="ai-reveal-caret" aria-hidden="true" />
-                        ) : null}
-                      </>
-                    )}
-                  </div>
-                  {showCauses ? (
-                    <div className="ai-msg-section">
-                      <div className="ai-msg-section-title">Почему так происходит</div>
-                      <ul className="ai-msg-list">
-                        {m.data?.probable_causes?.slice(0, 4).map((x, idx) => (
-                          <li key={`${m.id}-cause-${idx}`}>{x}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {showActions ? (
-                    <div className="ai-msg-section">
-                      <div className="ai-msg-section-title">Что делать</div>
-                      <ul className="ai-msg-list ai-msg-list-actions">
-                        {m.data?.actions?.slice(0, 5).map((x, idx) => (
-                          <li key={`${m.id}-action-${idx}`}>{x}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </div>
-              );
-              })
-            ) : (
-              <div className="ai-empty-chat">
-                {companyId ? "Выберите чат или начните новый диалог." : "Сначала выберите компанию, чтобы AI видел аналитику."}
-              </div>
-            )}
-          </div>
-          <form
-            className="ai-input-row"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void sendMessage();
-            }}
-          >
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Спросите AI по вашим данным..."
-              disabled={!companyId || loading}
-            />
-            <button type="submit" disabled={!companyId || loading || !input.trim()}>
-              {loading ? (
-                <span className="ai-send-dots" aria-hidden="true">
-                  <span />
-                  <span />
-                  <span />
-                </span>
-              ) : (
-                ">"
-              )}
+            </div>
+            <button type="button" className="ai-new-chat" onClick={newChat}>
+              + Новый чат
             </button>
-          </form>
+            <div className="ai-sessions">
+              {sessions.length ? (
+                sessions.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className={`ai-session-item ${s.id === currentId ? "active" : ""}`}
+                    onClick={() => {
+                      setCurrentId(s.id);
+                      setMobileSidebarOpen(false);
+                    }}
+                  >
+                    <div className="ai-session-title">{s.title}</div>
+                    <div className="ai-session-meta">{new Date(s.updatedAt).toLocaleString("ru-RU")}</div>
+                  </button>
+                ))
+              ) : (
+                <div className="ai-session-empty">Пока нет диалогов</div>
+              )}
+            </div>
+          </aside>
+
+          <div className="ai-chat">
+            <div className="ai-chat-mobile-head">
+              <button
+                type="button"
+                className="ai-mobile-sidebar-toggle"
+                onClick={() => setMobileSidebarOpen(true)}
+                aria-label="Открыть список чатов"
+              >
+                <span />
+                <span />
+                <span />
+              </button>
+              <div className="ai-mobile-chat-title">{currentSession?.title ?? "AI-чат"}</div>
+            </div>
+            <div className="ai-quick-row">
+              {QUICK_PROMPTS.map((q) => (
+                <button key={q} type="button" className="ai-quick-btn" onClick={() => void sendMessage(q)} disabled={!companyId || loading}>
+                  {q}
+                </button>
+              ))}
+            </div>
+            <div className="ai-history" ref={historyRef}>
+              {currentSession?.messages.length ? (
+                currentSession.messages.map((m) => {
+                  const causes = m.role === "assistant" ? sanitizeAssistantList(m.data?.probable_causes, 4) : [];
+                  const actions = m.role === "assistant" ? sanitizeAssistantList(m.data?.actions, 5) : [];
+                  const showCauses = m.role === "assistant" && causes.length > 0;
+                  const showActions = m.role === "assistant" && actions.length > 0;
+                  const assistantText = m.role === "assistant" ? sanitizeAssistantSummary(m.text) : m.text;
+                  return (
+                  <div key={m.id} className={`ai-msg ${m.role} ${m.id === streamingAssistantId ? "is-streaming" : ""}`}>
+                    <div className={`ai-msg-text ${m.role === "assistant" && (revealedCharsByMsgId[m.id] ?? 0) < m.text.length ? "revealing" : ""}`}>
+                      {m.id === streamingAssistantId && !m.text ? (
+                        <span className="ai-typing"><span /><span /><span /></span>
+                      ) : (
+                        <>
+                          {m.role === "assistant"
+                            ? assistantText.slice(0, Math.min(revealedCharsByMsgId[m.id] ?? 0, assistantText.length))
+                            : m.text}
+                          {m.role === "assistant" && (revealedCharsByMsgId[m.id] ?? 0) < m.text.length ? (
+                            <span className="ai-reveal-caret" aria-hidden="true" />
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                    {showCauses ? (
+                      <div className="ai-msg-section">
+                        <div className="ai-msg-section-title">Почему так происходит</div>
+                        <ul className="ai-msg-list">
+                          {causes.map((x, idx) => (
+                            <li key={`${m.id}-cause-${idx}`}>{x}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {showActions ? (
+                      <div className="ai-msg-section">
+                        <div className="ai-msg-section-title">Что делать</div>
+                        <ul className="ai-msg-list ai-msg-list-actions">
+                          {actions.map((x, idx) => (
+                            <li key={`${m.id}-action-${idx}`}>{x}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+                })
+              ) : (
+                <div className="ai-empty-chat">
+                  {companyId ? "Выберите чат или начните новый диалог." : "Сначала выберите компанию, чтобы AI видел аналитику."}
+                </div>
+              )}
+            </div>
+            <form
+              className="ai-input-row"
+              data-tour-id="ai-input-row"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void sendMessage();
+              }}
+            >
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Спросите AI по вашим данным..."
+                disabled={!companyId || loading}
+              />
+              <button type="submit" disabled={!companyId || loading || !input.trim()}>
+                {loading ? (
+                  <span className="ai-send-dots" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                ) : (
+                  ">"
+                )}
+              </button>
+            </form>
+          </div>
         </div>
+
+        <WhatIfStudio
+          companyId={companyId}
+          role={analyticsRole}
+          onNotify={onNotify}
+          onDiscussScenario={(question) => void sendMessage(question)}
+        />
       </div>
     </section>
   );

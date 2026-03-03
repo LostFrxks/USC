@@ -681,7 +681,7 @@ export default function AnalyticsScreen({
           )}
         </div>
 
-        <div className="analytic-card">
+        <div className="analytic-card" data-tour-id="analytics-kpi-overview">
           <div className="analytic-title">Рынок</div>
           <div className="analytic-row">
             <div className="analytic-metric">

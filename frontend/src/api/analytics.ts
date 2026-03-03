@@ -139,6 +139,67 @@ export type AnalyticsAssistantResponse = {
   };
 };
 
+export type WhatIfLevers = {
+  delivery_improve_pp?: number;
+  cancel_reduce_pp?: number;
+  top_category_share_reduce_pp?: number;
+  promo_intensity_pct?: number;
+  cheaper_supplier_shift_pct?: number;
+  reliable_supplier_shift_pct?: number;
+  price_cut_overpriced_pct?: number;
+  pipeline_recovery_pct?: number;
+};
+
+export type WhatIfMetrics = {
+  horizon_days: number;
+  periods: number;
+  monthly_base_som: number;
+  revenue_forecast_som: number;
+  mom_pct: number | null;
+  delivery_rate_pct: number;
+  cancel_rate_pct: number;
+  market_share_pct: number;
+  top_category_name: string;
+  top_category_share_pct: number;
+  supplier_hhi: number;
+  category_hhi: number;
+  savings_potential_som: number;
+  avg_watch_savings_pct: number;
+  leakage_score: number;
+  leakage_value_som: number;
+  repeat_rate_pct: number;
+};
+
+export type WhatIfResponse = {
+  role: "buyer" | "supplier";
+  horizon_days: 30 | 60 | 90;
+  selected_month: string | null;
+  levers: Required<WhatIfLevers>;
+  baseline: WhatIfMetrics;
+  scenario: WhatIfMetrics;
+  delta: Record<string, number | null>;
+  compare_series: Array<{ period: string; baseline: number; scenario: number }>;
+  drilldown: {
+    by: "category" | "sku";
+    points: Array<{ key: string; baseline: number; scenario: number; delta_pct: number }>;
+  };
+  drivers: string[];
+  warnings: string[];
+  confidence: number;
+};
+
+export type WhatIfScenario = {
+  id: number;
+  title: string;
+  role: "buyer" | "supplier";
+  horizon_days: number;
+  selected_month: string | null;
+  levers: Required<WhatIfLevers>;
+  result: WhatIfResponse | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export async function fetchAnalyticsSummary(params: {
   companyId: number;
   role: "supplier" | "buyer";
@@ -258,4 +319,79 @@ export async function streamAnalyticsAssistant(
 
   if (!donePayload) throw new Error("AI stream finished without payload");
   return donePayload;
+}
+
+export async function simulateWhatIf(params: {
+  companyId: number;
+  role: "buyer" | "supplier";
+  days?: number;
+  horizonDays: 30 | 60 | 90;
+  selectedMonth?: string | null;
+  drilldownBy?: "category" | "sku";
+  levers: WhatIfLevers;
+}) {
+  return api<WhatIfResponse>("/analytics/what-if", {
+    method: "POST",
+    auth: true,
+    body: {
+      company_id: params.companyId,
+      role: params.role,
+      days: params.days ?? 365,
+      horizon_days: params.horizonDays,
+      selected_month: params.selectedMonth ?? null,
+      drilldown_by: params.drilldownBy ?? "category",
+      levers: params.levers,
+    },
+  });
+}
+
+export async function fetchWhatIfScenarios(params: {
+  companyId: number;
+  role: "buyer" | "supplier";
+  limit?: number;
+}) {
+  const qs = new URLSearchParams();
+  qs.set("company_id", String(params.companyId));
+  qs.set("role", params.role);
+  qs.set("limit", String(params.limit ?? 30));
+  return api<{ items: WhatIfScenario[] }>(`/analytics/what-if/scenarios?${qs.toString()}`, { auth: true });
+}
+
+export async function createWhatIfScenario(params: {
+  companyId: number;
+  role: "buyer" | "supplier";
+  title?: string | null;
+  horizonDays: 30 | 60 | 90;
+  selectedMonth?: string | null;
+  levers: WhatIfLevers;
+  result?: WhatIfResponse | null;
+}) {
+  return api<WhatIfScenario>("/analytics/what-if/scenarios", {
+    method: "POST",
+    auth: true,
+    body: {
+      company_id: params.companyId,
+      role: params.role,
+      title: params.title ?? null,
+      horizon_days: params.horizonDays,
+      selected_month: params.selectedMonth ?? null,
+      levers: params.levers,
+      result: params.result ?? null,
+    },
+  });
+}
+
+export async function renameWhatIfScenario(scenarioId: number, title: string) {
+  return api<{ id: number; title: string; updated: boolean }>(`/analytics/what-if/scenarios/${scenarioId}`, {
+    method: "PATCH",
+    auth: true,
+    body: { title },
+  });
+}
+
+export async function deleteWhatIfScenario(scenarioId: number) {
+  return api<{ deleted: boolean }>(`/analytics/what-if/scenarios/${scenarioId}`, {
+    method: "DELETE",
+    auth: true,
+  });
 }

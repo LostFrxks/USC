@@ -392,3 +392,56 @@ Verification:
 - Added guard in bootstrap to auto-clone codex_remote when missing (no vendoring of external repository into USC).
 - Added ops/codex_remote to .gitignore to avoid accidental embedded-repo commits.
 - Updated codex_remote docs accordingly and prepared repository state for clean push to origin/main.
+[2026-03-03 09:55:38 +06:00] Task: Fix shortlisted AI wow ideas in project files
+- Added docs/ai_wow_ideas.md with 2 approved ideas: What-if Simulator and Ask -> Auto Chart + Drilldown.
+- Stored concise scope and expected wow effect for each idea as baseline for future implementation.
+[2026-03-03 09:57:47 +06:00] Task: Detailed what-if simulator product specification
+- Added docs/ai_what_if_spec.md with full spec for AI What-if Simulator (scope, levers, output metrics, deterministic model, API contract, UX, rollout).
+- Grounded the spec on existing analytics data contracts (buyer/supplier modules, HHI, leakage, trends, funnel) to keep implementation realistic.
+[2026-03-03 10:18:59 +06:00] Task: Implement AI What-if Studio in AI tab (backend + frontend)
+- Backend: added what-if persistence schema and migration (backend/app/db/schema.py, backend/alembic/versions/0007_ai_what_if_scenarios.py).
+- Backend: added deterministic scenario engine + CRUD service (backend/app/services/what_if.py).
+- Backend API: added /api/analytics/what-if and scenario CRUD endpoints in analytics router (simulate + list/create/rename/delete).
+- Frontend API: extended analytics API client with What-if types and methods (simulate/scenario CRUD).
+- Frontend UI: added WhatIfStudio component with role-aware levers, KPI baseline/scenario compare, compare/drilldown charts, scenario save/load, and chat handoff.
+- Frontend integration: embedded WhatIfStudio below AI chat in AI tab scroll flow (AIChatScreen).
+- Styling: added full AI what-if styling and AI main scroll container in screens.css.
+- Verification: pytest backend/tests/test_what_if_api.py + test_ai_chat_persistence_api.py passed; frontend build passed; frontend lint passed with one pre-existing AnalyticsScreen warning.
+
+[2026-03-03 10:30:10 +06:00] Task: Fix AI broken output (analytics_modules leakage + quotes)
+- Backend: strengthened assistant sanitization to remove inline analytics_modules.* tokens, strip markdown markers, normalize punctuation, and remove simple wrapping quotes around category/status names.
+- Backend: added _sanitize_assistant_payload and applied it consistently for cached, LLM, fallback, and streaming assistant responses before persist/return.
+- Backend: fallback generator (_assistant_answer) now returns sanitized summary/actions/causes and no longer injects quoted category names in causes.
+- Backend prompts: explicitly instructed model to avoid technical keys in user-facing text, avoid unnecessary quotes, and use сом for money context.
+- Frontend: added defensive sanitization in AIChatScreen for summary/causes/actions render path so old cached messages and edge responses are cleaned on display.
+- Tests: added regression tests in backend/tests/test_analytics_assistant.py for inline analytics_modules token stripping and quote removal; all analytics assistant tests pass.
+- Validation: pytest backend/tests/test_analytics_assistant.py -q passed; frontend npm run build passed.
+
+[2026-03-03 10:37:33 +06:00] Task: UX redesign for What-if Studio (simpler and clearer for non-analyst users)
+- Reworked WhatIfStudio structure into a guided flow: step-by-step guide, prominent hero result, and simplified control labels/hints.
+- Added quick presets (Conservative / Balanced / Aggressive) to let users start without tuning each metric manually.
+- Improved KPI cards readability with plain-language metric descriptions and outcome-aware delta coloring (e.g., lower cancel/leakage treated as positive).
+- Added explanatory hints for each lever directly under slider labels to make impact understandable.
+- Enhanced mobile responsiveness for new guide/hero/preset sections and improved typography/spacing for easier scanning.
+- Validation: frontend build passed after changes.
+
+[2026-03-03 12:30:18 +06:00] Task: Global onboarding guide (first-run + resume + replay) implemented
+- Added onboarding engine modules: frontend/src/onboarding/{types.ts,constants.ts,steps.ts,storage.ts,useOnboarding.ts,OnboardingOverlay.tsx}.
+- Implemented versioned localStorage persistence (Engine v1.0.0, Storage v1, Guide v1.0.0) with per-user/company/role keys and replay flag handling.
+- Added 8-step guided flow with mixed interaction steps (open drawer, cart checkout) and info steps across Home, Cart, Analytics, AI, Profile.
+- Integrated onboarding into App lifecycle: auto-start when authed + company selected + profile ready, resume from saved step after skip, finish marks completed.
+- Added spotlight overlay UX with target highlight, action gating, progress controls (Back/Next/Skip), and fallback behavior when target is missing.
+- Added stable tour selectors via data attributes: top burger, home grid, tab buttons, cart checkout button/panel, analytics KPI block, AI input row, profile switch company.
+- Added About -> Advanced hidden section (unlock after 5 taps on app version) with checkbox: 'Пройти гайд еще раз при следующем входе'.
+- Updated App/About wiring for replay request handling and onboarding state propagation.
+- Added tests: onboarding storage, onboarding hook, onboarding overlay, About advanced replay controls.
+- Updated e2e golden setup to preseed onboarding completed state to avoid tour interference; added onboarding e2e spec scaffold (currently marked skip).
+- Validation: frontend test:ci passed (26 tests), frontend build passed, frontend lint passed with one pre-existing AnalyticsScreen hook warning.
+
+[2026-03-03 12:36:11 +06:00] Netlify readiness audit: validated frontend production build (vite build OK); checked deploy config (no netlify.toml/_redirects); verified API base defaults to /api and requires external backend URL on Netlify; identified required backend CORS/env alignment for public testing.
+
+[2026-03-03 12:38:34 +06:00] Fixed onboarding overlay layout regression: in targeted steps the card no longer stretches to full height because inline position now sets bottom:auto when top is used. Updated frontend/src/onboarding/OnboardingOverlay.tsx; verified with frontend production build (npm run build).
+
+[2026-03-03 12:41:27 +06:00] Prepared dual deployment profiles (dev + mentor/netlify): added netlify.toml (frontend build/publish + SPA redirect), added .env.mentor.example with Netlify CORS template, wired CORS_ALLOW_ORIGINS/CORS_ALLOW_ORIGIN_REGEX into backend service in docker-compose.yml, updated README with full mentor pipeline (public backend + seed + Netlify env VITE_API_BASE). Verified frontend build (npm run build).
+
+[2026-03-03 12:44:51 +06:00] Git publish task: prepared full snapshot for remote push, including mentor/netlify deployment profile updates and current frontend/backend feature changes; excluded temporary frontend/test-results artifacts from commit.
