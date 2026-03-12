@@ -122,9 +122,6 @@ export default function HomeScreen({
         </div>
 
         <div className="categories" data-tour-id="home-categories">
-          <button className="category category-search" type="button" onClick={() => searchInputRef.current?.focus()}>
-            <img src="/media/search.png" alt="Поиск" style={{ width: 40, height: 40, borderRadius: 999 }} />
-          </button>
           {CATEGORIES.map((item) => {
             const isActive = category === item.key;
 
