@@ -5,6 +5,7 @@ import ProductDetailsSheet from "../ui/ProductDetailsSheet";
 import TopHeader from "../ui/TopHeader";
 import { useProducts } from "../hooks/useProducts";
 import { fetchSuppliers, type Supplier } from "../api/suppliers";
+import { preloadImages } from "../utils/imagePreload";
 
 export default function SearchScreen({
   active,
@@ -50,6 +51,10 @@ export default function SearchScreen({
 
   const { products, loading } = useProducts(categoryId, debounced);
   const filteredProducts = useMemo(() => products ?? [], [products]);
+
+  useEffect(() => {
+    preloadImages(filteredProducts.slice(0, 4).map((product) => product.image));
+  }, [filteredProducts]);
 
   useEffect(() => {
     let alive = true;
@@ -115,8 +120,14 @@ export default function SearchScreen({
                 ))}
               </>
             ) : (
-              filteredProducts.map((p) => (
-                <ProductCard key={p.id} product={p} onAdd={() => onAdd(p)} onOpen={() => setSelectedProduct(p)} />
+              filteredProducts.map((p, idx) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  onAdd={() => onAdd(p)}
+                  onOpen={() => setSelectedProduct(p)}
+                  priority={idx < 4}
+                />
               ))
             )}
           </div>

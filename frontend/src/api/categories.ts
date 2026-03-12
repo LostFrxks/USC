@@ -9,7 +9,30 @@ type ApiPage<T> = {
   results: T[];
 };
 
+const CATEGORIES_TTL_MS = 5 * 60 * 1000;
+
+let categoriesCache: { data: CategoryApi[]; expiresAt: number } | null = null;
+let categoriesInFlight: Promise<CategoryApi[]> | null = null;
+
 export async function fetchCategories(): Promise<CategoryApi[]> {
-  const page = await api<ApiPage<CategoryApi>>("/categories/", { auth: false });
-  return page.results;
+  const now = Date.now();
+  if (categoriesCache && categoriesCache.expiresAt > now) {
+    return categoriesCache.data;
+  }
+
+  if (categoriesInFlight) {
+    return categoriesInFlight;
+  }
+
+  categoriesInFlight = api<ApiPage<CategoryApi>>("/categories/", { auth: false })
+    .then((page) => {
+      const results = page.results;
+      categoriesCache = { data: results, expiresAt: Date.now() + CATEGORIES_TTL_MS };
+      return results;
+    })
+    .finally(() => {
+      categoriesInFlight = null;
+    });
+
+  return categoriesInFlight;
 }

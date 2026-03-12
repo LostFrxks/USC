@@ -4,6 +4,8 @@
 
 :root {
   --bg: #0b1220;
+  --app-shell-width: min(100vw, 420px);
+  --app-shell-left: calc(50% - (var(--app-shell-width) / 2));
   --surface: #f4f6fb;
   --card: #ffffff;
   --text: #0f172a;
@@ -50,12 +52,27 @@ body {
    =========================== */
 
 .app {
+  width: var(--app-shell-width);
   max-width: 420px;
   margin: 0 auto;
   min-height: 100dvh;
   background: linear-gradient(180deg, #f7f9ff 0%, #f4f6fb 50%, #eef2ff 100%);
   position: relative;
   color: var(--text);
+}
+
+@media (min-width: 700px) {
+  body {
+    background:
+      radial-gradient(1200px 520px at 50% -5%, rgba(76, 126, 255, 0.2), transparent 60%),
+      linear-gradient(180deg, #02122d 0%, #061937 100%);
+  }
+
+  .app {
+    box-shadow:
+      0 32px 80px rgba(2, 10, 28, 0.48),
+      0 0 0 1px rgba(148, 163, 184, 0.16);
+  }
 }
 
 .screens {
@@ -106,6 +123,11 @@ body {
 .screens.tab-transition-backward .screen.active > *:nth-child(7) { animation-delay: 144ms; }
 .screens.tab-transition-forward .screen.active > *:nth-child(8),
 .screens.tab-transition-backward .screen.active > *:nth-child(8) { animation-delay: 168ms; }
+
+.screens.tab-transition-forward .screen.active > .product-sheet-overlay,
+.screens.tab-transition-backward .screen.active > .product-sheet-overlay {
+  animation: none;
+}
 
 @keyframes screenBlockInFromLeft {
   from {

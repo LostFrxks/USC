@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from app.db.schema import accounts_user, companies_company
-from backend.tests.test_helpers import auth_headers, seed_company, seed_membership, seed_user
+from tests.test_helpers import auth_headers, seed_company, seed_membership, seed_user
 
 
 def test_profile_patch_success_updates_user_and_company(client, db_session):

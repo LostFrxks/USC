@@ -4,7 +4,7 @@
 
 #screen-home {
   --home-chain-step: 240px;
-  padding: 14px 14px 0;
+  padding: 14px 14px calc(var(--tabbar-space) + env(safe-area-inset-bottom) + 12px);
   background: transparent;
   position: relative;
   overflow: hidden;
@@ -19,9 +19,9 @@
   pointer-events: none;
   opacity: 0.13;
   background-image:
-    url("/media/red_chain_fixed.png"),
-    url("/media/red_chain_fixed.png"),
-    url("/media/red_chain_fixed.png"),
+    url("/media/red_chain.webp"),
+    url("/media/red_chain.webp"),
+    url("/media/red_chain.webp"),
     linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.22));
   background-repeat: repeat-x, repeat-x, repeat-x, no-repeat;
   background-size:
@@ -34,7 +34,7 @@
     calc(var(--home-chain-step) * -0.5) 44%,
     0 74%,
     center;
-  animation: home-chain-flow 26s linear infinite;
+  animation: none;
 }
 
 #screen-home::after {
@@ -89,16 +89,16 @@
   pointer-events: none;
   opacity: 0.13;
   background-image:
-    url("/media/red_chain_fixed.png"),
-    url("/media/red_chain_fixed.png"),
-    url("/media/red_chain_fixed.png");
+    url("/media/red_chain.webp"),
+    url("/media/red_chain.webp"),
+    url("/media/red_chain.webp");
   background-repeat: repeat-x, repeat-x, repeat-x;
   background-size: 230px auto, 230px auto, 230px auto;
   background-position:
     0 16%,
     -115px 48%,
     0 80%;
-  animation: home-card-chain-flow 24s linear infinite;
+  animation: none;
 }
 
 .home-card > * {
@@ -186,18 +186,6 @@
     transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.screen.active .categories .category {
-  animation: categoryEnter 380ms cubic-bezier(0.22, 0.9, 0.2, 1) both;
-}
-
-.screen.active .categories .category:nth-child(7n + 1) { animation-delay: 0ms; }
-.screen.active .categories .category:nth-child(7n + 2) { animation-delay: 28ms; }
-.screen.active .categories .category:nth-child(7n + 3) { animation-delay: 56ms; }
-.screen.active .categories .category:nth-child(7n + 4) { animation-delay: 84ms; }
-.screen.active .categories .category:nth-child(7n + 5) { animation-delay: 112ms; }
-.screen.active .categories .category:nth-child(7n + 6) { animation-delay: 140ms; }
-.screen.active .categories .category:nth-child(7n + 7) { animation-delay: 168ms; }
-
 .category:active {
   transform: translateY(1px) scale(0.96);
 }
@@ -211,10 +199,6 @@
 .category.active::before {
   opacity: 1;
   transform: scale(1);
-}
-
-.category.active:not(.category-search) img {
-  animation: categoryActivePulse 1.9s ease-in-out infinite;
 }
 
 .category-search img {
@@ -294,6 +278,9 @@
   box-shadow: var(--shadow-card);
   min-width: 0;
   border: 1px solid rgba(15, 23, 42, 0.06);
+  content-visibility: auto;
+  contain: layout paint style;
+  contain-intrinsic-size: 320px;
 }
 
 .product-card--interactive {
@@ -311,6 +298,7 @@
   height: 190px;
   object-fit: cover;
   display: block;
+  background: #eef2ff;
 }
 
 .product-body {
@@ -1342,11 +1330,67 @@
   gap: 10px;
 }
 
+.publication-work-card.is-collapsed {
+  gap: 0;
+}
+
 .publication-work-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 8px;
+}
+
+.publication-work-summary {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.publication-work-side {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  flex: 0 0 auto;
+}
+
+.publication-work-quickmeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.publication-work-quickmeta span {
+  font-size: 10px;
+  font-weight: 700;
+  color: #334155;
+  background: #f8fafc;
+  border-radius: 999px;
+  padding: 4px 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.publication-work-quickmeta span.is-dirty {
+  color: #9a3412;
+  background: #fff7ed;
+  border-color: rgba(249, 115, 22, 0.24);
+}
+
+.publication-expand-btn {
+  min-height: 32px;
+  border: none;
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(47, 102, 216, 0.1);
+  color: #1e3a8a;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.publication-expand-btn.is-open {
+  background: #1e3a8a;
+  color: #ffffff;
 }
 
 .publication-status-wrap {
@@ -1389,6 +1433,14 @@
   .publication-form-grid,
   .publication-work-grid {
     grid-template-columns: 1fr;
+  }
+
+  .publication-work-head {
+    align-items: stretch;
+  }
+
+  .publication-work-side {
+    justify-items: stretch;
   }
 
   .publications-hero-actions {
@@ -2185,14 +2237,18 @@
 .onboarding-root {
   position: fixed;
   inset: 0;
+  left: var(--app-shell-left);
+  right: auto;
+  width: var(--app-shell-width);
   z-index: 130;
   pointer-events: none;
 }
 
 .onboarding-scrim {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: var(--app-shell-left);
+  right: auto;
+  width: var(--app-shell-width);
   pointer-events: auto;
   background: rgba(7, 12, 24, 0.62);
   backdrop-filter: blur(1px);
@@ -2237,16 +2293,88 @@
   right: 12px;
   bottom: calc(var(--tabbar-space) + env(safe-area-inset-bottom) + 12px);
   max-width: 360px;
-  border-radius: 16px;
-  border: 1px solid rgba(47, 102, 216, 0.24);
-  background:
-    radial-gradient(130% 130% at 100% 0%, rgba(103, 141, 226, 0.12), transparent 52%),
-    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  box-shadow: 0 20px 44px rgba(2, 10, 28, 0.45);
-  padding: 12px;
+  border-radius: 22px;
+  border: 1px solid rgba(47, 102, 216, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 249, 255, 0.98) 100%);
+  box-shadow:
+    0 22px 54px rgba(2, 10, 28, 0.42),
+    0 10px 24px rgba(15, 23, 42, 0.18);
+  padding: 14px;
   pointer-events: auto;
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.onboarding-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 100% at 100% 0%, rgba(47, 102, 216, 0.18), transparent 54%),
+    radial-gradient(120% 120% at 0% 100%, rgba(251, 191, 36, 0.1), transparent 48%);
+}
+
+.onboarding-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.onboarding-card-glow {
+  position: absolute;
+  top: -46px;
+  right: -40px;
+  width: 160px;
+  height: 160px;
+  border-radius: 999px;
+  background: rgba(47, 102, 216, 0.18);
+  filter: blur(18px);
+  z-index: 0;
+}
+
+.onboarding-card.is-action::before {
+  background:
+    radial-gradient(120% 100% at 100% 0%, rgba(249, 115, 22, 0.2), transparent 54%),
+    radial-gradient(120% 120% at 0% 100%, rgba(251, 191, 36, 0.14), transparent 48%);
+}
+
+.onboarding-card.is-action .onboarding-card-glow {
+  background: rgba(249, 115, 22, 0.2);
+}
+
+.onboarding-card.is-insight::before {
+  background:
+    radial-gradient(120% 100% at 100% 0%, rgba(14, 165, 233, 0.2), transparent 54%),
+    radial-gradient(120% 120% at 0% 100%, rgba(59, 130, 246, 0.12), transparent 48%);
+}
+
+.onboarding-card.is-insight .onboarding-card-glow {
+  background: rgba(14, 165, 233, 0.22);
+}
+
+.onboarding-card.is-success::before {
+  background:
+    radial-gradient(120% 100% at 100% 0%, rgba(16, 185, 129, 0.2), transparent 54%),
+    radial-gradient(120% 120% at 0% 100%, rgba(34, 197, 94, 0.12), transparent 48%);
+}
+
+.onboarding-card.is-success .onboarding-card-glow {
+  background: rgba(16, 185, 129, 0.22);
+}
+
+.onboarding-progress-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.onboarding-progress-copy {
+  display: grid;
+  gap: 3px;
 }
 
 .onboarding-progress {
@@ -2257,18 +2385,70 @@
   text-transform: uppercase;
 }
 
+.onboarding-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.onboarding-progress-meter {
+  align-self: center;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+}
+
+.onboarding-progress-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1d4ed8, #60a5fa);
+}
+
+.onboarding-progress-segments {
+  display: grid;
+  grid-template-columns: repeat(var(--onboarding-total, 1), minmax(0, 1fr));
+  gap: 4px;
+}
+
+.onboarding-progress-segments span {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.22);
+}
+
+.onboarding-progress-segments span.done {
+  background: linear-gradient(90deg, #1d4ed8, #60a5fa);
+}
+
+.onboarding-copy {
+  display: grid;
+  gap: 6px;
+}
+
 .onboarding-card h3 {
   margin: 0;
-  font-size: 16px;
-  line-height: 1.2;
+  font-size: 18px;
+  line-height: 1.1;
   color: #0f172a;
+  letter-spacing: -0.02em;
 }
 
 .onboarding-card p {
   margin: 0;
   color: #334155;
   font-size: 13px;
-  line-height: 1.42;
+  line-height: 1.5;
 }
 
 .onboarding-action-hint {
@@ -2326,10 +2506,23 @@
   color: #ffffff;
 }
 
+.onboarding-card.is-action .onboarding-btn.primary {
+  background: linear-gradient(135deg, #ea580c, #c2410c);
+}
+
+.onboarding-card.is-insight .onboarding-btn.primary {
+  background: linear-gradient(135deg, #0284c7, #1d4ed8);
+}
+
+.onboarding-card.is-success .onboarding-btn.primary {
+  background: linear-gradient(135deg, #059669, #047857);
+}
+
 .onboarding-btn:disabled {
   opacity: 0.55;
   cursor: default;
 }
+
 
 @keyframes onboardingPulse {
   0%,
@@ -3362,6 +3555,7 @@
     max-width: none;
     bottom: calc(var(--tabbar-space) + env(safe-area-inset-bottom) + 8px);
   }
+  .onboarding-progress-row { grid-template-columns: 1fr; }
   .onboarding-card h3 { font-size: 15px; }
   .onboarding-card p { font-size: 12px; }
   .onboarding-actions { grid-template-columns: 1fr 1fr 1fr; }
@@ -3488,11 +3682,11 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 140px); /* С‡С‚РѕР±С‹ Р±РµР»С‹Р№ Р±Р»РѕРє РІРёР·СѓР°Р»СЊРЅРѕ С‚СЏРЅСѓР»СЃСЏ РІРЅРёР· */
+  min-height: calc(100vh - 140px); /* чтобы белый блок визуально тянулся вниз */
   margin-bottom: 50px;
 }
 
-/* top (РІРЅСѓС‚СЂРё РєР°СЂС‚РѕС‡РєРё) */
+/* top (внутри карточки) */
 .cart-top {
   padding: 18px 18px 10px;
 }
@@ -4966,14 +5160,14 @@ textarea.field-input {
   inset: 0;
   background-image:
     linear-gradient(180deg, rgba(255, 255, 255, 0.44) 0%, rgba(255, 255, 255, 0.2) 42%, rgba(255, 255, 255, 0.42) 100%),
-    url("/media/red_chain_fixed.png"),
-    url("/media/red_chain_fixed.png"),
-    url("/media/red_chain_fixed.png"),
-    url("/media/red_chain_fixed.png"),
-    url("/media/red_chain_fixed.png"),
-    url("/media/red_chain_fixed.png"),
-    url("/media/red_chain_fixed.png"),
-    url("/media/red_chain_fixed.png");
+    url("/media/red_chain.webp"),
+    url("/media/red_chain.webp"),
+    url("/media/red_chain.webp"),
+    url("/media/red_chain.webp"),
+    url("/media/red_chain.webp"),
+    url("/media/red_chain.webp"),
+    url("/media/red_chain.webp"),
+    url("/media/red_chain.webp");
   background-repeat: no-repeat, repeat-x, repeat-x, repeat-x, repeat-x, repeat-x, repeat-x, repeat-x, repeat-x;
   background-size:
     100% 100%,
@@ -5326,6 +5520,15 @@ textarea.field-input {
   background: linear-gradient(180deg, #f8fbff 0%, #f1f6ff 100%);
   border-radius: 14px;
   padding: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-test-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .auth-test-title {
@@ -5340,10 +5543,52 @@ textarea.field-input {
   color: #64748b;
 }
 
+.auth-test-scrollhint {
+  width: 44px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  position: relative;
+  overflow: hidden;
+  flex: 0 0 auto;
+  margin-top: 4px;
+}
+
+.auth-test-scrollhint span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2f66d8, #7cc7ff);
+  animation: authScrollCue 1.6s ease-in-out infinite;
+}
+
 .auth-test-list {
   margin-top: 8px;
   display: grid;
   gap: 7px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(47, 102, 216, 0.75) rgba(148, 163, 184, 0.18);
+}
+
+.auth-test-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.auth-test-list::-webkit-scrollbar-track {
+  background: rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+}
+
+.auth-test-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #2f66d8 0%, #6ab8ff 100%);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
 }
 
 .auth-test-item {
@@ -5353,9 +5598,17 @@ textarea.field-input {
   padding: 8px;
 }
 
+.auth-test-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .auth-test-main {
   display: grid;
   gap: 2px;
+  min-width: 0;
 }
 
 .auth-test-email {
@@ -5368,6 +5621,26 @@ textarea.field-input {
 .auth-test-pass {
   font-size: 11px;
   color: #334155;
+}
+
+.auth-test-login {
+  min-height: 34px;
+  border: none;
+  border-radius: 999px;
+  padding: 0 12px;
+  background: linear-gradient(135deg, #2f66d8, #1f3c88);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(31, 60, 136, 0.2);
+  flex: 0 0 auto;
+}
+
+.auth-test-login:disabled {
+  opacity: 0.6;
+  cursor: default;
+  box-shadow: none;
 }
 
 .auth-test-meta {
@@ -5385,6 +5658,21 @@ textarea.field-input {
   border: none;
   border-radius: 999px;
   padding: 3px 6px;
+}
+
+@keyframes authScrollCue {
+  0% {
+    transform: translateX(0);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateX(26px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 0.55;
+  }
 }
 
 /* ===========================
@@ -6764,7 +7052,7 @@ textarea.field-input {
    =========================== */
 
 #screen-ai {
-  padding: 14px 14px 0;
+  padding: 14px 14px calc(var(--tabbar-space) + env(safe-area-inset-bottom) + 10px);
 }
 
 #screen-profile {
@@ -7282,6 +7570,23 @@ textarea.field-input {
   font-size: 12px;
   text-align: center;
   padding: 14px 10px;
+}
+
+.ai-onboarding-note {
+  margin: 10px 8px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(47, 102, 216, 0.18);
+  background: rgba(239, 246, 255, 0.84);
+  color: #1e3a8a;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ai-onboarding-note.is-ready {
+  border-color: rgba(16, 185, 129, 0.24);
+  background: rgba(220, 252, 231, 0.86);
+  color: #166534;
 }
 
 .ai-input-row {
@@ -7846,6 +8151,805 @@ textarea.field-input {
   padding: 8px;
 }
 
+.ai-whatif-dialog {
+  width: min(92vw, 420px);
+}
+
+.ai-whatif-dialog-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.ai-whatif-dialog-input {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: #ffffff;
+  padding: 0 12px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.ai-whatif-dialog-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.secondary-button {
+  min-height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.ai-whatif-danger {
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+}
+
+.ai-whatif.ai-whatif-theater {
+  gap: 14px;
+  border-radius: 26px;
+  border-color: rgba(27, 78, 159, 0.18);
+  container-type: inline-size;
+  background:
+    radial-gradient(110% 140% at 100% 0%, rgba(14, 116, 144, 0.14), transparent 55%),
+    radial-gradient(120% 120% at 0% 100%, rgba(249, 115, 22, 0.08), transparent 48%),
+    linear-gradient(180deg, #fcfdff 0%, #f3f8ff 100%);
+  box-shadow:
+    0 20px 44px rgba(15, 23, 42, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.ai-whatif-stage-hero,
+.ai-whatif-control-grid,
+.ai-whatif-reality-wall,
+.ai-whatif-insights,
+.ai-whatif-decision-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.ai-whatif-stage-hero,
+.ai-whatif-control-grid,
+.ai-whatif-reality-wall {
+  grid-template-columns: 1.25fr 1fr;
+}
+
+.ai-whatif-stage-hero {
+  align-items: stretch;
+}
+
+.ai-whatif-stage-copy,
+.ai-whatif-stage-impact,
+.ai-whatif-control-panel,
+.ai-whatif-pressure-board,
+.ai-whatif-scene,
+.ai-whatif-moneyflow,
+.ai-whatif-chart,
+.ai-whatif-decision-card {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+  border-radius: 22px;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+}
+
+.ai-whatif-stage-copy,
+.ai-whatif-control-panel,
+.ai-whatif-pressure-board,
+.ai-whatif-scene,
+.ai-whatif-moneyflow,
+.ai-whatif-chart,
+.ai-whatif-decision-card {
+  padding: 14px;
+}
+
+.ai-whatif-stage-copy {
+  background:
+    radial-gradient(120% 120% at 100% 0%, rgba(37, 99, 235, 0.12), transparent 56%),
+    linear-gradient(135deg, #0f172a 0%, #12284d 42%, #1e3a8a 100%);
+  color: #ffffff;
+}
+
+.ai-whatif-stage-kicker,
+.ai-whatif-panel-title,
+.ai-whatif-decision-kicker {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ai-whatif-stage-kicker {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.ai-whatif-stage-copy h4,
+.ai-whatif-decision-card h4 {
+  margin: 8px 0 0;
+  font-size: 26px;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+
+.ai-whatif-stage-copy p,
+.ai-whatif-decision-card p {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ai-whatif-stage-meta {
+  margin-top: 14px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ai-whatif-stage-meta span,
+.ai-whatif-scene-loading {
+  border-radius: 999px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ai-whatif-stage-meta span {
+  background: rgba(255, 255, 255, 0.12);
+  color: #eff6ff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ai-whatif-stage-impact {
+  position: relative;
+  padding: 14px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  background:
+    radial-gradient(130% 120% at 100% 0%, rgba(16, 185, 129, 0.12), transparent 48%),
+    linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.ai-whatif-stage-orb {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 110px;
+  height: 110px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.ai-whatif-stage-orb span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  background: radial-gradient(circle at 35% 35%, rgba(96, 165, 250, 0.34), rgba(29, 78, 216, 0.06) 54%, transparent 68%);
+  animation: aiWhatIfOrb 8s linear infinite;
+}
+
+.ai-whatif-stage-orb span:nth-child(2) {
+  inset: 12px;
+  animation-duration: 6s;
+  animation-direction: reverse;
+}
+
+.ai-whatif-stage-orb span:nth-child(3) {
+  inset: 28px;
+  animation-duration: 4.8s;
+}
+
+.ai-whatif-stage-impact-label,
+.ai-whatif-panel-subtitle,
+.ai-whatif-money-note,
+.ai-whatif-pressure-card p,
+.ai-whatif-node p {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ai-whatif-stage-impact-value {
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.ai-whatif-stage-impact-value.up { color: #047857; }
+.ai-whatif-stage-impact-value.down { color: #b91c1c; }
+
+.ai-whatif-switchboard {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+}
+
+.ai-whatif-dna-strip,
+.ai-whatif-acts {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 20px;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+  padding: 14px;
+}
+
+.ai-whatif-dna-strip {
+  display: grid;
+  gap: 10px;
+  background:
+    radial-gradient(90% 120% at 100% 0%, rgba(59, 130, 246, 0.08), transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(248, 250, 252, 0.96) 100%);
+}
+
+.ai-whatif-dna-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ai-whatif-dna-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  border: 1px solid rgba(59, 130, 246, 0.14);
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ai-whatif-dna-pill b {
+  color: #1d4ed8;
+  font-size: 11px;
+}
+
+.ai-whatif-dna-empty {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ai-whatif-control-panel,
+.ai-whatif-pressure-board,
+.ai-whatif-moneyflow {
+  display: grid;
+  gap: 10px;
+}
+
+.ai-whatif-panel-title {
+  color: #0f172a;
+}
+
+.ai-whatif-pressure-grid,
+.ai-whatif-decision-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ai-whatif-pressure-grid,
+.ai-whatif-money-columns,
+.ai-whatif-decision-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-whatif-pressure-card {
+  border-radius: 16px;
+  padding: 12px;
+  color: #0f172a;
+  min-width: 0;
+}
+
+.ai-whatif-pressure-card.blue { background: linear-gradient(180deg, #eef5ff 0%, #ffffff 100%); }
+.ai-whatif-pressure-card.amber { background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%); }
+.ai-whatif-pressure-card.green { background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%); }
+.ai-whatif-pressure-card.red { background: linear-gradient(180deg, #fff1f2 0%, #ffffff 100%); }
+
+.ai-whatif-pressure-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.ai-whatif-pressure-top span,
+.ai-whatif-node-values span,
+.ai-whatif-money-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.ai-whatif-pressure-top strong {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.ai-whatif-pressure-meter,
+.ai-whatif-shock-meter {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+}
+
+.ai-whatif-pressure-meter span,
+.ai-whatif-shock-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1d4ed8, #60a5fa);
+}
+
+.ai-whatif-scene-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.ai-whatif-scene-loading {
+  color: #1d4ed8;
+  background: rgba(219, 234, 254, 0.72);
+}
+
+.ai-whatif-cascade {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ai-whatif-node {
+  position: relative;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  overflow: visible;
+  min-width: 0;
+}
+
+.ai-whatif-node.demand { background: linear-gradient(180deg, #eef5ff 0%, #ffffff 100%); }
+.ai-whatif-node.ops { background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%); }
+.ai-whatif-node.risk { background: linear-gradient(180deg, #fff1f2 0%, #ffffff 100%); }
+.ai-whatif-node.value { background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%); }
+
+.ai-whatif-node-eyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+.ai-whatif-node-title,
+.ai-whatif-money-value {
+  margin-top: 8px;
+  font-size: 18px;
+  line-height: 1.05;
+  font-weight: 900;
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+
+.ai-whatif-node-values {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ai-whatif-node-values strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.ai-whatif-node-delta {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ai-whatif-node-delta.up { color: #047857; }
+.ai-whatif-node-delta.down { color: #b91c1c; }
+.ai-whatif-node-delta.neutral { color: #334155; }
+
+.ai-whatif-node-connector {
+  position: absolute;
+  top: 50%;
+  right: -14px;
+  width: 18px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.4), rgba(37, 99, 235, 0.9));
+}
+
+.ai-whatif-moneyflow {
+  grid-template-columns: 220px 1fr;
+}
+
+.ai-whatif-money-columns {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ai-whatif-money-card {
+  border-radius: 18px;
+  padding: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  min-width: 0;
+}
+
+.ai-whatif-money-card.blue { background: linear-gradient(180deg, #eef5ff 0%, #ffffff 100%); }
+.ai-whatif-money-card.green { background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%); }
+.ai-whatif-money-card.red { background: linear-gradient(180deg, #fff1f2 0%, #ffffff 100%); }
+.ai-whatif-money-card.gold { background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%); }
+
+.ai-whatif-money-visual {
+  position: relative;
+  height: 140px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.04), rgba(15, 23, 42, 0.01));
+  overflow: hidden;
+}
+
+.ai-whatif-money-base,
+.ai-whatif-money-live {
+  position: absolute;
+  bottom: 0;
+  width: 44px;
+  border-radius: 14px 14px 0 0;
+}
+
+.ai-whatif-money-base {
+  background: rgba(148, 163, 184, 0.4);
+  right: calc(50% + 4px);
+}
+
+.ai-whatif-money-live {
+  background: linear-gradient(180deg, #1d4ed8 0%, #38bdf8 100%);
+  left: calc(50% + 4px);
+}
+
+.ai-whatif-chart-wide {
+  min-width: 0;
+}
+
+.ai-whatif-shock-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-whatif-shock-item {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 10px;
+  min-width: 0;
+}
+
+.ai-whatif-shock-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.ai-whatif-shock-top strong {
+  font-size: 12px;
+  color: #0f172a;
+}
+
+.ai-whatif-shock-top span,
+.ai-whatif-money-note,
+.ai-whatif-shock-item small {
+  font-size: 11px;
+}
+
+.ai-whatif-shock-top .up { color: #047857; }
+.ai-whatif-shock-top .down { color: #b91c1c; }
+.ai-whatif-shock-top .neutral { color: #334155; }
+
+.ai-whatif-acts {
+  display: grid;
+  gap: 10px;
+}
+
+.ai-whatif-acts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ai-whatif-act-card {
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(14, 165, 233, 0.12), transparent 52%),
+    linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ai-whatif-act-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.ai-whatif-act-period {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+.ai-whatif-act-title {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.08;
+  color: #0f172a;
+}
+
+.ai-whatif-act-delta {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ai-whatif-act-delta.up { color: #047857; }
+.ai-whatif-act-delta.down { color: #b91c1c; }
+.ai-whatif-act-delta.neutral { color: #334155; }
+
+.ai-whatif-act-meter {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  overflow: hidden;
+}
+
+.ai-whatif-act-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0f172a, #2563eb, #38bdf8);
+}
+
+.ai-whatif-decision-card {
+  min-height: 150px;
+  min-width: 0;
+}
+
+@keyframes aiWhatIfOrb {
+  0% {
+    transform: rotate(0deg) scale(0.98);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.04);
+  }
+  100% {
+    transform: rotate(360deg) scale(0.98);
+  }
+}
+
+.ai-whatif-decision-card.up { background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%); }
+.ai-whatif-decision-card.down { background: linear-gradient(180deg, #fff1f2 0%, #ffffff 100%); }
+.ai-whatif-decision-card.neutral { background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%); }
+
+.ai-whatif-decision-card h4 {
+  margin: 6px 0 0;
+  font-size: 18px;
+  line-height: 1.15;
+  color: #0f172a;
+}
+
+.ai-whatif-decision-card p {
+  color: #334155;
+}
+
+@container (max-width: 420px) {
+  .ai-whatif.ai-whatif-theater {
+    gap: 10px;
+    padding: 8px;
+    border-radius: 20px;
+  }
+
+  .ai-whatif-head,
+  .ai-whatif-scene-head,
+  .ai-whatif-scenarios-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .ai-whatif-actions,
+  .ai-whatif-switchboard,
+  .ai-whatif-stage-hero,
+  .ai-whatif-control-grid,
+  .ai-whatif-reality-wall,
+  .ai-whatif-moneyflow,
+  .ai-whatif-pressure-grid,
+  .ai-whatif-money-columns,
+  .ai-whatif-insights,
+  .ai-whatif-decision-grid,
+  .ai-whatif-acts-grid,
+  .ai-whatif-cascade {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-whatif-actions button,
+  .ai-whatif-presets button {
+    width: 100%;
+  }
+
+  .ai-whatif-stage-copy,
+  .ai-whatif-stage-impact,
+  .ai-whatif-control-panel,
+  .ai-whatif-pressure-board,
+  .ai-whatif-scene,
+  .ai-whatif-moneyflow,
+  .ai-whatif-chart,
+  .ai-whatif-dna-strip,
+  .ai-whatif-acts,
+  .ai-whatif-scenarios,
+  .ai-whatif-decision-card,
+  .ai-whatif-insights-block {
+    padding: 10px;
+    border-radius: 16px;
+  }
+
+  .ai-whatif-stage-copy h4,
+  .ai-whatif-decision-card h4 {
+    font-size: 19px;
+  }
+
+  .ai-whatif-stage-impact {
+    min-height: 160px;
+    align-content: end;
+  }
+
+  .ai-whatif-stage-impact-value {
+    font-size: 28px;
+  }
+
+  .ai-whatif-stage-orb {
+    width: 72px;
+    height: 72px;
+    top: 10px;
+    right: 10px;
+  }
+
+  .ai-whatif-stage-meta span,
+  .ai-whatif-scene-loading {
+    min-height: 24px;
+    padding: 0 8px;
+    font-size: 10px;
+  }
+
+  .ai-whatif-pill-group {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .ai-whatif-pill-group > span {
+    font-size: 10px;
+  }
+
+  .ai-whatif-pill-group button {
+    min-height: 34px;
+    font-size: 12px;
+  }
+
+  .ai-whatif-dna-pill {
+    width: 100%;
+    justify-content: space-between;
+    min-height: 36px;
+    padding: 0 10px;
+  }
+
+  .ai-whatif-node {
+    padding: 12px;
+  }
+
+  .ai-whatif-node-title,
+  .ai-whatif-money-value,
+  .ai-whatif-act-title {
+    font-size: 16px;
+  }
+
+  .ai-whatif-node-values,
+  .ai-whatif-bar-values {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .ai-whatif-bar-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .ai-whatif-bar-label {
+    white-space: normal;
+  }
+
+  .ai-whatif-bar-values small {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(226, 232, 240, 0.75);
+    padding: 0 10px;
+  }
+
+  .ai-whatif-money-visual {
+    height: 92px;
+  }
+
+  .ai-whatif-money-base,
+  .ai-whatif-money-live {
+    width: 28px;
+  }
+
+  .ai-whatif-node-connector {
+    display: none;
+  }
+
+  .ai-whatif-scenario-item {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-whatif-scenario-actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .ai-whatif-scenario-title {
+    font-size: 11px;
+  }
+
+  .ai-whatif-scenario-meta,
+  .ai-whatif-money-note,
+  .ai-whatif-shock-item small,
+  .ai-whatif-panel-subtitle,
+  .ai-whatif-pressure-card p,
+  .ai-whatif-node p {
+    font-size: 10px;
+  }
+}
+
 .ai-typing {
   display: inline-flex;
   align-items: center;
@@ -7996,6 +9100,37 @@ textarea.field-input {
     grid-template-columns: 1fr;
   }
 
+  .ai-whatif-stage-hero,
+  .ai-whatif-control-grid,
+  .ai-whatif-reality-wall,
+  .ai-whatif-moneyflow {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-whatif-stage-hero,
+  .ai-whatif-control-grid,
+  .ai-whatif-reality-wall,
+  .ai-whatif-moneyflow,
+  .ai-whatif-insights,
+  .ai-whatif-decision-grid {
+    gap: 12px;
+  }
+
+  .ai-whatif-stage-copy,
+  .ai-whatif-stage-impact,
+  .ai-whatif-control-panel,
+  .ai-whatif-pressure-board,
+  .ai-whatif-scene,
+  .ai-whatif-moneyflow,
+  .ai-whatif-chart,
+  .ai-whatif-dna-strip,
+  .ai-whatif-acts,
+  .ai-whatif-scenarios,
+  .ai-whatif-decision-card {
+    border-radius: 18px;
+    padding: 12px;
+  }
+
   .ai-whatif-guide,
   .ai-whatif-hero {
     grid-template-columns: 1fr;
@@ -8003,19 +9138,109 @@ textarea.field-input {
 
   .ai-whatif-presets {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
   }
 
   .ai-whatif-pills {
     grid-template-columns: 1fr;
   }
 
-  .ai-whatif-bar-row {
+  .ai-whatif-switchboard {
     grid-template-columns: 1fr;
-    gap: 4px;
+  }
+
+  .ai-whatif-pill-group {
+    grid-template-columns: 72px 1fr;
+  }
+
+  .ai-whatif-pill-group button {
+    min-height: 34px;
+    font-size: 12px;
+  }
+
+  .ai-whatif-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ai-whatif-actions button {
+    width: 100%;
+  }
+
+  .ai-whatif-bar-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
   }
 
   .ai-whatif-bar-values {
-    justify-items: start;
+    grid-template-columns: 1fr 1fr;
+    justify-items: stretch;
+    gap: 6px;
+  }
+
+  .ai-whatif-bar-values small {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(226, 232, 240, 0.75);
+    padding: 0 10px;
+  }
+
+  .ai-whatif-cascade,
+  .ai-whatif-decision-grid,
+  .ai-whatif-acts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-whatif-pressure-grid,
+  .ai-whatif-money-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ai-whatif-scene-head,
+  .ai-whatif-scenarios-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ai-whatif-node-values {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ai-whatif-moneyflow {
+    overflow: hidden;
+  }
+
+  .ai-whatif-money-visual {
+    height: 112px;
+  }
+
+  .ai-whatif-money-base,
+  .ai-whatif-money-live {
+    width: 34px;
+  }
+
+  .ai-whatif-scenario-item {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+
+  .ai-whatif-scenario-actions {
+    flex-direction: row;
+  }
+
+  .ai-whatif-node-connector {
+    display: none;
+  }
+
+  .ai-whatif-stage-orb {
+    width: 88px;
+    height: 88px;
+    top: 14px;
+    right: 14px;
   }
 }
 
@@ -8059,19 +9284,24 @@ textarea.field-input {
   }
 
   .ai-whatif {
-    padding: 10px;
+    padding: 8px;
+    gap: 10px;
+    border-radius: 20px;
   }
 
   .ai-whatif-head {
     flex-direction: column;
+    gap: 10px;
   }
 
   .ai-whatif-actions {
     width: 100%;
+    grid-template-columns: 1fr;
   }
 
   .ai-whatif-actions button {
     flex: 1;
+    min-height: 42px;
   }
 
   .ai-whatif-guide span {
@@ -8084,6 +9314,135 @@ textarea.field-input {
 
   .ai-whatif-presets {
     grid-template-columns: 1fr;
+  }
+
+  .ai-whatif-stage-copy h4 {
+    font-size: 20px;
+  }
+
+  .ai-whatif-switchboard {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-whatif-stage-copy,
+  .ai-whatif-stage-impact,
+  .ai-whatif-control-panel,
+  .ai-whatif-pressure-board,
+  .ai-whatif-scene,
+  .ai-whatif-moneyflow,
+  .ai-whatif-chart,
+  .ai-whatif-dna-strip,
+  .ai-whatif-acts,
+  .ai-whatif-scenarios,
+  .ai-whatif-decision-card,
+  .ai-whatif-insights-block {
+    border-radius: 16px;
+    padding: 10px;
+  }
+
+  .ai-whatif-stage-meta {
+    gap: 4px;
+  }
+
+  .ai-whatif-stage-meta span,
+  .ai-whatif-scene-loading {
+    min-height: 24px;
+    padding: 0 8px;
+    font-size: 10px;
+  }
+
+  .ai-whatif-stage-impact {
+    min-height: 168px;
+    align-content: end;
+  }
+
+  .ai-whatif-stage-impact-value {
+    font-size: 28px;
+  }
+
+  .ai-whatif-stage-orb {
+    width: 72px;
+    height: 72px;
+    top: 10px;
+    right: 10px;
+  }
+
+  .ai-whatif-dna-pill {
+    width: 100%;
+    justify-content: space-between;
+    min-height: 36px;
+    padding: 0 10px;
+  }
+
+  .ai-whatif-pill-group {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .ai-whatif-pill-group > span {
+    font-size: 10px;
+  }
+
+  .ai-whatif-pressure-grid,
+  .ai-whatif-money-columns,
+  .ai-whatif-insights,
+  .ai-whatif-decision-grid,
+  .ai-whatif-acts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-whatif-node {
+    padding: 12px;
+  }
+
+  .ai-whatif-node-title,
+  .ai-whatif-money-value,
+  .ai-whatif-act-title,
+  .ai-whatif-decision-card h4 {
+    font-size: 16px;
+  }
+
+  .ai-whatif-node-values {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .ai-whatif-bar-label {
+    white-space: normal;
+  }
+
+  .ai-whatif-bar-values {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-whatif-money-visual {
+    height: 92px;
+  }
+
+  .ai-whatif-money-base,
+  .ai-whatif-money-live {
+    width: 28px;
+  }
+
+  .ai-whatif-scenario-item {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-whatif-scenario-actions {
+    justify-content: flex-end;
+  }
+
+  .ai-whatif-scenario-title {
+    font-size: 11px;
+  }
+
+  .ai-whatif-scenario-meta,
+  .ai-whatif-money-note,
+  .ai-whatif-shock-item small,
+  .ai-whatif-panel-subtitle,
+  .ai-whatif-pressure-card p,
+  .ai-whatif-node p {
+    font-size: 10px;
   }
 }
 
@@ -8605,6 +9964,9 @@ textarea.field-input {
 .company-overlay {
   position: fixed;
   inset: 0;
+  left: var(--app-shell-left);
+  right: auto;
+  width: var(--app-shell-width);
   background: rgba(15, 23, 42, 0.35);
   display: flex;
   align-items: center;
@@ -8658,4 +10020,3 @@ textarea.field-input {
   font-size: 12px;
   color: #6b7280;
 }
-

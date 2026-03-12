@@ -86,6 +86,7 @@ class OrderListRow(BaseModel):
     id: int
     status: str
     created_at: Optional[datetime] = None
+    delivery_address: Optional[str] = None
     comment: Optional[str] = None
     items_count: Optional[int] = None
     total: Optional[float] = None
@@ -104,6 +105,7 @@ class OrderDetailOut(BaseModel):
     id: int
     status: str
     created_at: Optional[datetime] = None
+    delivery_address: Optional[str] = None
     comment: Optional[str] = None
     buyer_company_id: int
     supplier_company_id: int
@@ -174,15 +176,80 @@ def _serialize_delivery(db: Session, order_id: int) -> dict | None:
     }
 
 
+def _normalize_order_text(
+    delivery_address: str | None,
+    comment: str | None,
+) -> tuple[str | None, str | None]:
+    address = (delivery_address or "").strip() or None
+    text = (comment or "").strip()
+    if address:
+        return address, text or None
+
+    if "\n" not in text:
+        return None, text or None
+
+    first_line, remainder = text.split("\n", 1)
+    inferred_address = first_line.strip() or None
+    inferred_comment = remainder.strip() or None
+    return inferred_address, inferred_comment
+
+
+def _order_payload_with_text_fields(payload: dict) -> dict:
+    delivery_address, comment = _normalize_order_text(payload.get("delivery_address"), payload.get("comment"))
+    data = dict(payload)
+    data["delivery_address"] = delivery_address
+    data["comment"] = comment
+    return data
+
+
 def _serialize_order_full(db: Session, order_id: int) -> dict:
     order = db.execute(select(orders_order).where(orders_order.c.id == order_id)).mappings().first()
     if not order:
         raise HTTPException(404, detail="Order not found")
     items = db.execute(select(orders_item).where(orders_item.c.order_id == order_id).order_by(orders_item.c.id.asc())).mappings().all()
-    data = dict(order)
+    data = _order_payload_with_text_fields(dict(order))
     data["items"] = [dict(r) for r in items]
     data["delivery"] = _serialize_delivery(db, order_id)
     return data
+
+
+def _serialize_orders_bulk(db: Session, order_rows: list[dict]) -> list[dict]:
+    if not order_rows:
+        return []
+
+    order_ids = [int(row["id"]) for row in order_rows]
+    item_rows = db.execute(
+        select(orders_item)
+        .where(orders_item.c.order_id.in_(order_ids))
+        .order_by(orders_item.c.order_id.asc(), orders_item.c.id.asc())
+    ).mappings().all()
+    delivery_rows = db.execute(
+        select(delivery_assignment).where(delivery_assignment.c.order_id.in_(order_ids))
+    ).mappings().all()
+
+    items_by_order: dict[int, list[dict]] = {}
+    for row in item_rows:
+        items_by_order.setdefault(int(row["order_id"]), []).append(dict(row))
+
+    deliveries_by_order = {
+        int(row["order_id"]): {
+            "id": row.get("id"),
+            "courier": row.get("courier_id"),
+            "status": row.get("status"),
+            "tracking_link": row.get("tracking_link"),
+            "notes": row.get("notes"),
+        }
+        for row in delivery_rows
+    }
+
+    serialized: list[dict] = []
+    for row in order_rows:
+        order_id = int(row["id"])
+        payload = _order_payload_with_text_fields(dict(row))
+        payload["items"] = items_by_order.get(order_id, [])
+        payload["delivery"] = deliveries_by_order.get(order_id)
+        serialized.append(payload)
+    return serialized
 
 
 def _invalidate_order_related_cache() -> None:
@@ -210,6 +277,7 @@ def list_orders(
     o_id = _col(orders_order, "id")
     o_status = _col(orders_order, "status")
     o_created_at = _col(orders_order, "created_at")
+    o_delivery_address = _col(orders_order, "delivery_address")
     o_comment = _col(orders_order, "comment")
     o_buyer = _col(orders_order, "buyer_company_id")
     o_supplier = _col(orders_order, "supplier_company_id")
@@ -229,20 +297,21 @@ def list_orders(
             o_id.label("id"),
             o_status.label("status"),
             o_created_at.label("created_at"),
+            o_delivery_address.label("delivery_address"),
             o_comment.label("comment"),
             func.count(orders_item.c.id).label("items_count"),
             func.coalesce(func.sum(oi_qty * oi_price), 0).label("total"),
         )
         .select_from(orders_order.outerjoin(orders_item, oi_order_id == o_id))
         .where(cond)
-        .group_by(o_id, o_status, o_created_at, o_comment)
+        .group_by(o_id, o_status, o_created_at, o_delivery_address, o_comment)
         .order_by(o_id.desc())
         .limit(limit)
         .offset(offset)
     )
 
     rows = db.execute(q).mappings().all()
-    response = [OrderListRow(**dict(r)).model_dump() for r in rows]
+    response = [OrderListRow(**_order_payload_with_text_fields(dict(r))).model_dump() for r in rows]
     set_json(cache_key, response, settings.CACHE_TTL_ORDERS_LIST)
     return response
 
@@ -303,6 +372,7 @@ def create_order(
     o_id = _col(orders_order, "id")
     o_status = _col(orders_order, "status")
     o_delivery_mode = _col(orders_order, "delivery_mode")
+    o_delivery_address = _col(orders_order, "delivery_address")
     o_comment = _col(orders_order, "comment")
     o_created_at = _col(orders_order, "created_at")
     o_buyer = _col(orders_order, "buyer_company_id")
@@ -338,7 +408,6 @@ def create_order(
 
     address = payload.resolved_address()
     comment_clean = (payload.comment or "").strip()
-    combined_comment = f"{address}\n{comment_clean}".strip()
     delivery_mode = payload.resolved_delivery_mode()
 
     try:
@@ -349,7 +418,8 @@ def create_order(
                 {
                     o_status.name: status,
                     o_delivery_mode.name: delivery_mode,
-                    o_comment.name: combined_comment,
+                    o_delivery_address.name: address,
+                    o_comment.name: comment_clean,
                     o_created_at.name: now,
                     o_buyer.name: payload.buyer_company_id,
                     o_supplier.name: payload.supplier_company_id,
@@ -439,15 +509,12 @@ def inbox(user: dict = Depends(get_current_user), db: Session = Depends(get_db))
     company_ids = _company_ids_for_user(db, u_id)
     if not company_ids:
         return []
-    ids = [
-        int(r[0])
-        for r in db.execute(
-            select(orders_order.c.id)
-            .where(orders_order.c.supplier_company_id.in_(company_ids))
-            .order_by(orders_order.c.id.desc())
-        ).all()
-    ]
-    response = [_serialize_order_full(db, oid) for oid in ids]
+    rows = db.execute(
+        select(orders_order)
+        .where(orders_order.c.supplier_company_id.in_(company_ids))
+        .order_by(orders_order.c.id.desc())
+    ).mappings().all()
+    response = _serialize_orders_bulk(db, [dict(r) for r in rows])
     set_json(cache_key, response, settings.CACHE_TTL_ORDERS_BOX)
     return response
 
@@ -462,15 +529,12 @@ def outbox(user: dict = Depends(get_current_user), db: Session = Depends(get_db)
     company_ids = _company_ids_for_user(db, u_id)
     if not company_ids:
         return []
-    ids = [
-        int(r[0])
-        for r in db.execute(
-            select(orders_order.c.id)
-            .where(orders_order.c.buyer_company_id.in_(company_ids))
-            .order_by(orders_order.c.id.desc())
-        ).all()
-    ]
-    response = [_serialize_order_full(db, oid) for oid in ids]
+    rows = db.execute(
+        select(orders_order)
+        .where(orders_order.c.buyer_company_id.in_(company_ids))
+        .order_by(orders_order.c.id.desc())
+    ).mappings().all()
+    response = _serialize_orders_bulk(db, [dict(r) for r in rows])
     set_json(cache_key, response, settings.CACHE_TTL_ORDERS_BOX)
     return response
 
@@ -487,6 +551,7 @@ def order_detail(
     o_buyer = _col(orders_order, "buyer_company_id")
     o_supplier = _col(orders_order, "supplier_company_id")
     o_status = _col(orders_order, "status")
+    o_delivery_address = _col(orders_order, "delivery_address")
     o_comment = _col(orders_order, "comment")
     o_created_at = _col(orders_order, "created_at")
 
@@ -503,6 +568,7 @@ def order_detail(
             o_id.label("id"),
             o_status.label("status"),
             o_created_at.label("created_at"),
+            o_delivery_address.label("delivery_address"),
             o_comment.label("comment"),
             o_buyer.label("buyer_company_id"),
             o_supplier.label("supplier_company_id"),
@@ -536,7 +602,7 @@ def order_detail(
     ).mappings().all()
 
     items = [OrderItemOut(**dict(r)) for r in items_rows]
-    response = OrderDetailOut(**dict(header), items=items).model_dump()
+    response = OrderDetailOut(**_order_payload_with_text_fields(dict(header)), items=items).model_dump()
     set_json(cache_key, response, settings.CACHE_TTL_ORDER_DETAIL)
     return response
 

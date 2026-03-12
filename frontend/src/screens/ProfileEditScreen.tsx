@@ -89,9 +89,7 @@ export default function ProfileEditScreen({
         <div className="profile-edit-avatar">{initials || "US"}</div>
         <div className="profile-edit-hero-main">
           <div className="profile-edit-hero-title">Личный кабинет</div>
-          <div className="profile-edit-hero-subtitle">
-            Обновите контакты пользователя и данные активной компании.
-          </div>
+          <div className="profile-edit-hero-subtitle">Обновите контакты пользователя и данные активной компании.</div>
         </div>
       </div>
 
@@ -197,4 +195,3 @@ export default function ProfileEditScreen({
     </section>
   );
 }
-

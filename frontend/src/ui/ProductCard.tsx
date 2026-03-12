@@ -29,10 +29,12 @@ export function ProductCard({
   product,
   onAdd,
   onOpen,
+  priority = false,
 }: {
   product: Product;
   onAdd: () => void;
   onOpen?: () => void;
+  priority?: boolean;
 }) {
   const priceText = typeof product.price === "number" && product.price > 0 ? `${product.price} сом` : "по запросу";
   const description = String(product.description || "").trim();
@@ -64,7 +66,9 @@ export function ProductCard({
         src={product.image}
         alt={product.name}
         className="product-image"
-        loading="lazy"
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        fetchPriority={priority ? "high" : "low"}
         onError={(e) => {
           (e.currentTarget as HTMLImageElement).src = "/media/card_meat1.jpg";
         }}

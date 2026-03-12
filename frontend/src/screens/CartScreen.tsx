@@ -23,6 +23,7 @@ export default function CartScreen({
   onCheckoutOpenChange,
   buyerCompanyId,
   onNotify,
+  onboardingDemoMode = false,
 }: {
   active: boolean;
   items: CartItem[];
@@ -37,6 +38,7 @@ export default function CartScreen({
   onCheckoutOpenChange?: (open: boolean) => void;
   buyerCompanyId?: number | null;
   onNotify: (message: string, tone?: ToastTone) => void;
+  onboardingDemoMode?: boolean;
 }) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -48,7 +50,29 @@ export default function CartScreen({
   const [mapError, setMapError] = useState<string | null>(null);
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("SUPPLIER_COURIER");
 
-  const itemsCount = useMemo(() => items.reduce((acc, it) => acc + it.qty, 0), [items]);
+  const demoItem = useMemo<CartItem>(
+    () => ({
+      product: {
+        id: "tour-demo-item",
+        name: "Тестовый товар для гайда",
+        seller: "USC Demo",
+        description: "Нужен только для показа оформления заказа в onboarding.",
+        price: 199,
+        rating: "5.0",
+        reviews: 1,
+        image: "media/card_meat1.jpg",
+        category: "meat",
+        supplier_company_id: 999999,
+        category_id: 1,
+      },
+      qty: 1,
+    }),
+    []
+  );
+  const hasOnboardingDemo = onboardingDemoMode && items.length === 0;
+  const visibleItems = hasOnboardingDemo ? [demoItem] : items;
+  const visibleTotal = hasOnboardingDemo ? demoItem.product.price * demoItem.qty : total;
+  const itemsCount = useMemo(() => visibleItems.reduce((acc, it) => acc + it.qty, 0), [visibleItems]);
   const canCheckout = !creating && itemsCount > 0 && Boolean(buyerCompanyId);
   const canSubmitOrder = canCheckout && address.trim().length > 0;
   const coordInputState = useMemo(() => validateLatLngInputs(latInput, lngInput), [latInput, lngInput]);
@@ -76,10 +100,14 @@ export default function CartScreen({
 
   const submitOrder = async () => {
     if (!canSubmitOrder) return;
+    if (hasOnboardingDemo) {
+      onNotify("Это демонстрационный checkout для гайда. Чтобы создать реальный заказ, добавьте товар с витрины.", "info");
+      return;
+    }
 
     const supplierIds = Array.from(
       new Set(
-        items
+        visibleItems
           .map((it) => it.product.supplier_company_id)
           .filter((x): x is number => typeof x === "number" && !Number.isNaN(x))
       )
@@ -110,7 +138,7 @@ export default function CartScreen({
         buyer_company_id: Number(buyerCompanyId),
         supplier_company_id: supplierIds[0],
         delivery_mode: deliveryMode,
-        items: items.map((it) => ({
+        items: visibleItems.map((it) => ({
           product_id: Number(it.product.id),
           qty: it.qty,
         })),
@@ -145,7 +173,7 @@ export default function CartScreen({
       </header>
 
       <div className="cart-content cart-content-modern">
-        {items.length === 0 ? (
+        {visibleItems.length === 0 ? (
           <div className="cart-empty cart-empty-modern">
             <div className="cart-empty-icon">{"\ud83e\uddfa"}</div>
             <div className="cart-empty-title">{"\u041a\u043e\u0440\u0437\u0438\u043d\u0430 \u043f\u043e\u043a\u0430 \u043f\u0443\u0441\u0442\u0430\u044f"}</div>
@@ -158,17 +186,18 @@ export default function CartScreen({
         ) : (
           <>
             <div className="cart-toolbar">
-              <div className="cart-chip">{`\u041f\u043e\u0437\u0438\u0446\u0438\u0439: ${items.length}`}</div>
+              <div className="cart-chip">{`\u041f\u043e\u0437\u0438\u0446\u0438\u0439: ${visibleItems.length}`}</div>
               <div className="cart-chip">{`\u0421\u0443\u043c\u043c\u0430\u0440\u043d\u043e: ${itemsCount} \u0448\u0442.`}</div>
-              <button className="cart-clear" type="button" onClick={onClear} disabled={creating}>
+              <button className="cart-clear" type="button" onClick={onClear} disabled={creating || hasOnboardingDemo}>
                 {"\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u044c"}
               </button>
             </div>
 
             <div className="cart-items">
-              {items.map((it) => {
+              {visibleItems.map((it) => {
                 const price = Number(it.product.price) || 0;
                 const subtotal = price * it.qty;
+                const isDemoItem = hasOnboardingDemo && it.product.id === demoItem.product.id;
 
                 return (
                   <article className="cart-item cart-item-modern" key={it.product.id}>
@@ -191,7 +220,7 @@ export default function CartScreen({
                             className="qty-btn qty-btn-light"
                             type="button"
                             onClick={() => onDec(it.product.id)}
-                            disabled={it.qty <= 1 || creating}
+                            disabled={it.qty <= 1 || creating || isDemoItem}
                             title={"\u041c\u0438\u043d\u0443\u0441"}
                           >
                             {"\u2212"}
@@ -202,7 +231,7 @@ export default function CartScreen({
                             type="button"
                             onClick={() => onInc(it.product.id)}
                             title={"\u041f\u043b\u044e\u0441"}
-                            disabled={creating}
+                            disabled={creating || isDemoItem}
                           >
                             +
                           </button>
@@ -214,9 +243,9 @@ export default function CartScreen({
                           onClick={() => onRemove(it.product.id)}
                           title={"\u0423\u0434\u0430\u043b\u0438\u0442\u044c"}
                           aria-label={"\u0423\u0434\u0430\u043b\u0438\u0442\u044c"}
-                          disabled={creating}
+                          disabled={creating || isDemoItem}
                         >
-                          {"\u0423\u0434\u0430\u043b\u0438\u0442\u044c"}
+                          {isDemoItem ? "Демо" : "\u0423\u0434\u0430\u043b\u0438\u0442\u044c"}
                         </button>
                       </div>
                     </div>
@@ -229,7 +258,7 @@ export default function CartScreen({
               <div className="cart-sticky-top">
                 <div>
                   <div className="cart-sticky-label">{"\u0418\u0442\u043e\u0433\u043e"}</div>
-                  <div className="cart-sticky-amount">{`${total} \u0441\u043e\u043c`}</div>
+                  <div className="cart-sticky-amount">{`${visibleTotal} \u0441\u043e\u043c`}</div>
                 </div>
                 <div className={`cart-company-state ${buyerCompanyId ? "ok" : "warn"}`}>
                   {buyerCompanyId
@@ -255,6 +284,9 @@ export default function CartScreen({
             {checkoutOpen && (
               <section className="checkout-inline" data-tour-id="cart-checkout-panel">
                 <div className="checkout-inline-title">{"\u041e\u0444\u043e\u0440\u043c\u043b\u0435\u043d\u0438\u0435 \u0437\u0430\u043a\u0430\u0437\u0430"}</div>
+                {hasOnboardingDemo ? (
+                  <div className="coords-warning">Это демонстрационный checkout для гайда. Реальный заказ появится после добавления товара с витрины.</div>
+                ) : null}
 
                 <label className="field">
                   <div className="field-label">{"\u0410\u0434\u0440\u0435\u0441 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438"}</div>
@@ -386,6 +418,5 @@ export default function CartScreen({
     </section>
   );
 }
-
 
 

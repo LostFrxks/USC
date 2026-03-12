@@ -7,10 +7,11 @@ from sqlalchemy import insert
 
 from app.services.idempotency import canonical_body_hash
 from app.db.schema import idempotency_record
-from backend.tests.test_helpers import (
+from tests.test_helpers import (
     auth_headers,
     seed_company,
     seed_membership,
+    seed_order,
     seed_product,
     seed_user,
 )
@@ -88,3 +89,30 @@ def test_create_order_idempotency_conflict_returns_409(client, db_session, monke
     assert second.status_code == 409
     detail = second.json().get("detail", {})
     assert detail.get("error", {}).get("code") == "IDEMPOTENCY_CONFLICT"
+
+
+def test_order_detail_exposes_delivery_address_separately_from_comment(client, db_session):
+    seed_user(db_session, user_id=1, email="buyer@test.local")
+    seed_company(db_session, company_id=10, name="Buyer Co", company_type="BUYER")
+    seed_company(db_session, company_id=20, name="Supplier Co", company_type="SUPPLIER")
+    seed_membership(db_session, member_id=1, user_id=1, company_id=10)
+    seed_order(
+        db_session,
+        order_id=900,
+        buyer_company_id=10,
+        supplier_company_id=20,
+        status="PENDING",
+        delivery_address="Addr",
+        comment="test",
+    )
+    db_session.commit()
+
+    response = client.get(
+        "/api/orders/900/?buyer_company_id=10",
+        headers=auth_headers(1, "buyer@test.local"),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["delivery_address"] == "Addr"
+    assert payload["comment"] == "test"

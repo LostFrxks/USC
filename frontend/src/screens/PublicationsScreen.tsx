@@ -47,7 +47,7 @@ function makeDefaultCreateForm() {
     certifications: "",
     leadTimeDays: "",
     price: "",
-    unit: "С€С‚",
+    unit: "шт",
     minQty: "1",
     inStock: true,
     trackInventory: false,
@@ -56,7 +56,7 @@ function makeDefaultCreateForm() {
 }
 
 function formatMoney(value: number): string {
-  return `${Math.round(value).toLocaleString("ru-RU")} СЃРѕРј`;
+  return `${Math.round(value).toLocaleString("ru-RU")} сом`;
 }
 
 function formatNumber(value: number): string {
@@ -136,6 +136,7 @@ export default function PublicationsScreen({
   const [creating, setCreating] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(makeDefaultCreateForm);
+  const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
 
   const isSupplier = (role || "").toLowerCase() === "supplier";
   const canLoadData = active && isSupplier && !!companyId;
@@ -156,14 +157,14 @@ export default function PublicationsScreen({
       .catch((error: unknown) => {
         if (!alive) return;
         if (isApiError(error) && error.status === 403) {
-          setErrorText("Р­С‚Р° РєРѕРјРїР°РЅРёСЏ РЅРµ СЏРІР»СЏРµС‚СЃСЏ РїРѕСЃС‚Р°РІС‰РёРєРѕРј. Р’С‹Р±РµСЂРёС‚Рµ РєРѕРјРїР°РЅРёСЋ-РїРѕСЃС‚Р°РІС‰РёРєР°.");
+          setErrorText("Эта компания не является поставщиком. Выберите компанию-поставщика.");
           return;
         }
         if (isApiError(error)) {
-          setErrorText(`РћС€РёР±РєР° API: ${error.status}`);
+          setErrorText(`Ошибка API: ${error.status}`);
           return;
         }
-        setErrorText("РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РїСѓР±Р»РёРєР°С†РёРё РїРѕСЃС‚Р°РІС‰РёРєР°.");
+        setErrorText("Не удалось загрузить публикации поставщика.");
       })
       .finally(() => {
         if (!alive) return;
@@ -282,7 +283,7 @@ export default function PublicationsScreen({
     const shelfLifeDays = parseNumericInput(draft.shelfLifeDays);
     if (draft.shelfLifeDays.trim()) {
       if (shelfLifeDays == null || shelfLifeDays < 0) {
-        onNotify?.("РЎСЂРѕРє РіРѕРґРЅРѕСЃС‚Рё РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ С‡РёСЃР»РѕРј 0 РёР»Рё Р±РѕР»СЊС€Рµ", "error");
+        onNotify?.("Срок годности должен быть числом 0 или больше", "error");
         return;
       }
       const normalizedShelfLife = Math.trunc(shelfLifeDays);
@@ -346,7 +347,7 @@ export default function PublicationsScreen({
 
     const price = parseNumericInput(draft.price);
     if (price == null || price <= 0) {
-      onNotify?.("Р¦РµРЅР° РґРѕР»Р¶РЅР° Р±С‹С‚СЊ Р±РѕР»СЊС€Рµ РЅСѓР»СЏ", "error");
+      onNotify?.("Цена должна быть больше нуля", "error");
       return;
     }
     if (Math.abs(price - product.price) > 0.0001) payload.price = price;
@@ -356,14 +357,14 @@ export default function PublicationsScreen({
     const stockQty = parseNumericInput(draft.stockQty);
     if (draft.trackInventory) {
       if (stockQty == null || stockQty < 0) {
-        onNotify?.("РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Р№ РѕСЃС‚Р°С‚РѕРє (0 РёР»Рё Р±РѕР»СЊС€Рµ)", "error");
+        onNotify?.("Укажите корректный остаток (0 или больше)", "error");
         return;
       }
       if (stockQty !== product.stockQty) payload.stock_qty = stockQty;
     }
 
     if (Object.keys(payload).length === 0) {
-      onNotify?.("РР·РјРµРЅРµРЅРёР№ РЅРµС‚", "info");
+      onNotify?.("Изменений нет", "info");
       return;
     }
 
@@ -372,10 +373,10 @@ export default function PublicationsScreen({
       const updated = await updateSupplierProduct(product.id, payload);
       setProducts((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       setDrafts((prev) => ({ ...prev, [updated.id]: buildDraft(updated) }));
-      onNotify?.(`РЎРѕС…СЂР°РЅРµРЅРѕ: ${updated.name}`, "success");
+      onNotify?.(`Сохранено: ${updated.name}`, "success");
     } catch (error: unknown) {
-      if (isApiError(error)) onNotify?.(`РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ (${error.status})`, "error");
-      else onNotify?.("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РёР·РјРµРЅРµРЅРёСЏ", "error");
+      if (isApiError(error)) onNotify?.(`Ошибка сохранения (${error.status})`, "error");
+      else onNotify?.("Не удалось сохранить изменения", "error");
     } finally {
       setSavingId(null);
     }
@@ -383,7 +384,7 @@ export default function PublicationsScreen({
 
   async function handleDelete(product: SupplierProduct) {
     if (savingId != null || deletingId != null) return;
-    const ok = window.confirm(`РЈРґР°Р»РёС‚СЊ РїСѓР±Р»РёРєР°С†РёСЋ "${product.name}"?`);
+    const ok = window.confirm(`Удалить публикацию "${product.name}"?`);
     if (!ok) return;
     setDeletingId(product.id);
     try {
@@ -394,10 +395,10 @@ export default function PublicationsScreen({
         delete next[product.id];
         return next;
       });
-      onNotify?.(`РЈРґР°Р»РµРЅРѕ: ${product.name}`, "success");
+      onNotify?.(`Удалено: ${product.name}`, "success");
     } catch (error: unknown) {
-      if (isApiError(error)) onNotify?.(`РћС€РёР±РєР° СѓРґР°Р»РµРЅРёСЏ (${error.status})`, "error");
-      else onNotify?.("РќРµ СѓРґР°Р»РѕСЃСЊ СѓРґР°Р»РёС‚СЊ РїСѓР±Р»РёРєР°С†РёСЋ", "error");
+      if (isApiError(error)) onNotify?.(`Ошибка удаления (${error.status})`, "error");
+      else onNotify?.("Не удалось удалить публикацию", "error");
     } finally {
       setDeletingId(null);
     }
@@ -407,17 +408,17 @@ export default function PublicationsScreen({
     if (!companyId || creating) return;
     const name = createForm.name.trim();
     if (!name) {
-      onNotify?.("Р’РІРµРґРёС‚Рµ РЅР°Р·РІР°РЅРёРµ С‚РѕРІР°СЂР°", "error");
+      onNotify?.("Введите название товара", "error");
       return;
     }
     const price = parseNumericInput(createForm.price);
     if (price == null || price <= 0) {
-      onNotify?.("РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅСѓСЋ С†РµРЅСѓ", "error");
+      onNotify?.("Укажите корректную цену", "error");
       return;
     }
     const minQty = parseNumericInput(createForm.minQty);
     if (minQty == null || minQty <= 0) {
-      onNotify?.("РњРёРЅРёРјР°Р»СЊРЅС‹Р№ Р·Р°РєР°Р· РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ Р±РѕР»СЊС€Рµ 0", "error");
+      onNotify?.("Минимальный заказ должен быть больше 0", "error");
       return;
     }
     const stockQty = parseNumericInput(createForm.stockQty);
@@ -425,7 +426,7 @@ export default function PublicationsScreen({
     const netWeightGrams = parseNumericInput(createForm.netWeightGrams);
     const leadTimeDays = parseNumericInput(createForm.leadTimeDays);
     if (createForm.shelfLifeDays.trim() && (shelfLifeDays == null || shelfLifeDays < 0)) {
-      onNotify?.("РЎСЂРѕРє РіРѕРґРЅРѕСЃС‚Рё РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ С‡РёСЃР»РѕРј 0 РёР»Рё Р±РѕР»СЊС€Рµ", "error");
+      onNotify?.("Срок годности должен быть числом 0 или больше", "error");
       return;
     }
     if (createForm.netWeightGrams.trim() && (netWeightGrams == null || netWeightGrams < 0)) {
@@ -437,7 +438,7 @@ export default function PublicationsScreen({
       return;
     }
     if (createForm.trackInventory && (stockQty == null || stockQty < 0)) {
-      onNotify?.("Р”Р»СЏ СѓС‡РµС‚Р° СЃРєР»Р°РґР° СѓРєР°Р¶РёС‚Рµ РѕСЃС‚Р°С‚РѕРє 0 РёР»Рё Р±РѕР»СЊС€Рµ", "error");
+      onNotify?.("Для учета склада укажите остаток 0 или больше", "error");
       return;
     }
 
@@ -459,7 +460,7 @@ export default function PublicationsScreen({
         certifications: createForm.certifications.trim() || undefined,
         lead_time_days: createForm.leadTimeDays.trim() ? Math.trunc(leadTimeDays as number) : undefined,
         price,
-        unit: createForm.unit.trim() || "С€С‚",
+        unit: createForm.unit.trim() || "шт",
         min_qty: minQty,
         in_stock: createForm.inStock,
         track_inventory: createForm.trackInventory,
@@ -470,10 +471,10 @@ export default function PublicationsScreen({
       setDrafts((prev) => ({ ...prev, [created.id]: buildDraft(created) }));
       setCreateForm(makeDefaultCreateForm());
       setCreateOpen(false);
-      onNotify?.(`РџСѓР±Р»РёРєР°С†РёСЏ РґРѕР±Р°РІР»РµРЅР°: ${created.name}`, "success");
+      onNotify?.(`Публикация добавлена: ${created.name}`, "success");
     } catch (error: unknown) {
-      if (isApiError(error)) onNotify?.(`РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ (${error.status})`, "error");
-      else onNotify?.("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РїСѓР±Р»РёРєР°С†РёСЋ", "error");
+      if (isApiError(error)) onNotify?.(`Ошибка создания (${error.status})`, "error");
+      else onNotify?.("Не удалось создать публикацию", "error");
     } finally {
       setCreating(false);
     }
@@ -484,28 +485,28 @@ export default function PublicationsScreen({
       <SecondaryTopbar onBurger={onBurger} onNotifications={onOpenNotifications} notificationCount={notificationCount} />
 
       <header className="simple-header">
-        <div className="simple-title">Р’Р°С€Рё РїСѓР±Р»РёРєР°С†РёРё</div>
+        <div className="simple-title">Ваши публикации</div>
       </header>
 
       {!isSupplier ? (
         <div className="publications-empty">
-          <div className="publications-empty-title">Р Р°Р·РґРµР» РґРѕСЃС‚СѓРїРµРЅ С‚РѕР»СЊРєРѕ РїРѕСЃС‚Р°РІС‰РёРєСѓ</div>
+          <div className="publications-empty-title">Раздел доступен только поставщику</div>
           <div className="publications-empty-text">
-            Р”Р»СЏ РїРѕРєСѓРїР°С‚РµР»РµР№ Р·РґРµСЃСЊ РЅРµС‚ РґРµР№СЃС‚РІРёР№. РџРµСЂРµРєР»СЋС‡РёС‚Рµ СЂРѕР»СЊ РёР»Рё РєРѕРјРїР°РЅРёСЋ РЅР° РїРѕСЃС‚Р°РІС‰РёРєР°.
+            Для покупателей здесь нет действий. Переключите роль или компанию на поставщика.
           </div>
           {onPickCompany ? (
             <button type="button" className="publication-primary-btn" onClick={onPickCompany}>
-              Р’С‹Р±СЂР°С‚СЊ РєРѕРјРїР°РЅРёСЋ
+              Выбрать компанию
             </button>
           ) : null}
         </div>
       ) : showCompanyBanner ? (
         <div className="publications-empty">
-          <div className="publications-empty-title">РЎРЅР°С‡Р°Р»Р° РІС‹Р±РµСЂРёС‚Рµ РєРѕРјРїР°РЅРёСЋ</div>
-          <div className="publications-empty-text">РџРѕСЃР»Рµ РІС‹Р±РѕСЂР° РєРѕРјРїР°РЅРёРё Р·Р°РіСЂСѓР·СЏС‚СЃСЏ РІР°С€Рё СЂРµР°Р»СЊРЅС‹Рµ С‚РѕРІР°СЂС‹.</div>
+          <div className="publications-empty-title">Сначала выберите компанию</div>
+          <div className="publications-empty-text">После выбора компании загрузятся ваши реальные товары.</div>
           {onPickCompany ? (
             <button type="button" className="publication-primary-btn" onClick={onPickCompany}>
-              Р’С‹Р±СЂР°С‚СЊ РєРѕРјРїР°РЅРёСЋ
+              Выбрать компанию
             </button>
           ) : null}
         </div>
@@ -513,8 +514,8 @@ export default function PublicationsScreen({
         <>
           <div className="publications-hero publications-hero--work">
             <div>
-              <div className="publications-hero-title">РљР°Р±РёРЅРµС‚ РїРѕСЃС‚Р°РІС‰РёРєР°</div>
-              <div className="publications-hero-sub">РЈРїСЂР°РІР»СЏР№С‚Рµ С†РµРЅРѕР№, РѕСЃС‚Р°С‚РєР°РјРё Рё РЅР°Р»РёС‡РёРµРј РІ РѕРґРЅРѕРј РјРµСЃС‚Рµ</div>
+              <div className="publications-hero-title">Кабинет поставщика</div>
+              <div className="publications-hero-sub">Управляйте ценой, остатками и наличием в одном месте</div>
             </div>
             <div className="publications-hero-actions">
               <button
@@ -523,7 +524,7 @@ export default function PublicationsScreen({
                 onClick={() => setCreateOpen((x) => !x)}
                 disabled={!companyId || creating}
               >
-                {createOpen ? "РЎРєСЂС‹С‚СЊ С„РѕСЂРјСѓ" : "Р”РѕР±Р°РІРёС‚СЊ SKU"}
+                {createOpen ? "Скрыть форму" : "Добавить SKU"}
               </button>
               <button
                 className="publication-primary-btn"
@@ -537,53 +538,53 @@ export default function PublicationsScreen({
                       setDrafts(Object.fromEntries(rows.map((row) => [row.id, buildDraft(row)])));
                       setErrorText(null);
                     })
-                    .catch(() => setErrorText("РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ СЃРїРёСЃРѕРє РїСѓР±Р»РёРєР°С†РёР№"))
+                    .catch(() => setErrorText("Не удалось обновить список публикаций"))
                     .finally(() => setLoading(false));
                 }}
               >
-                РћР±РЅРѕРІРёС‚СЊ
+                Обновить
               </button>
             </div>
           </div>
 
           <div className="publications-stats">
             <div className="publication-kpi">
-              <div className="publication-kpi-label">Р’СЃРµРіРѕ SKU</div>
+              <div className="publication-kpi-label">Всего SKU</div>
               <div className="publication-kpi-value">{stats.all}</div>
             </div>
             <div className="publication-kpi">
-              <div className="publication-kpi-label">Р’ РЅР°Р»РёС‡РёРё</div>
+              <div className="publication-kpi-label">В наличии</div>
               <div className="publication-kpi-value">{stats.inStock}</div>
             </div>
             <div className="publication-kpi">
-              <div className="publication-kpi-label">Р—Р°РєР°РЅС‡РёРІР°СЋС‚СЃСЏ</div>
+              <div className="publication-kpi-label">Заканчиваются</div>
               <div className="publication-kpi-value">{stats.lowStock}</div>
             </div>
             <div className="publication-kpi">
-              <div className="publication-kpi-label">РћС†РµРЅРєР° РѕСЃС‚Р°С‚РєР°</div>
+              <div className="publication-kpi-label">Оценка остатка</div>
               <div className="publication-kpi-value">{formatMoney(stats.inventoryValue)}</div>
             </div>
           </div>
 
           {createOpen ? (
             <div className="publication-create-card">
-              <div className="publication-create-title">РќРѕРІР°СЏ РїСѓР±Р»РёРєР°С†РёСЏ</div>
+              <div className="publication-create-title">Новая публикация</div>
               <div className="publication-form-grid">
                 <label className="publication-field publication-field--wide">
-                  <span>РќР°Р·РІР°РЅРёРµ С‚РѕРІР°СЂР°</span>
+                  <span>Название товара</span>
                   <input
                     value={createForm.name}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="РќР°РїСЂРёРјРµСЂ: РњРѕР»РѕРєРѕ 3.2% 1Р»"
+                    placeholder="Например: Молоко 3.2% 1 л"
                   />
                 </label>
                 <label className="publication-field">
-                  <span>РљР°С‚РµРіРѕСЂРёСЏ</span>
+                  <span>Категория</span>
                   <select
                     value={createForm.categoryId}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, categoryId: e.target.value }))}
                   >
-                    <option value="">Р‘РµР· РєР°С‚РµРіРѕСЂРёРё</option>
+                    <option value="">Без категории</option>
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
                         {cat.name}
@@ -592,7 +593,7 @@ export default function PublicationsScreen({
                   </select>
                 </label>
                 <label className="publication-field">
-                  <span>Р¦РµРЅР° (СЃРѕРј)</span>
+                  <span>Цена (сом)</span>
                   <input
                     inputMode="decimal"
                     value={createForm.price}
@@ -601,15 +602,15 @@ export default function PublicationsScreen({
                   />
                 </label>
                 <label className="publication-field">
-                  <span>Р•Рґ. РёР·Рј.</span>
+                  <span>Ед. изм.</span>
                   <input
                     value={createForm.unit}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, unit: e.target.value }))}
-                    placeholder="РєРі / С€С‚ / Р»"
+                    placeholder="кг / шт / л"
                   />
                 </label>
                 <label className="publication-field">
-                  <span>РњРёРЅ. Р·Р°РєР°Р·</span>
+                  <span>Мин. заказ</span>
                   <input
                     inputMode="decimal"
                     value={createForm.minQty}
@@ -618,12 +619,12 @@ export default function PublicationsScreen({
                   />
                 </label>
                 <label className="publication-field publication-field--wide">
-                  <span>РћРїРёСЃР°РЅРёРµ</span>
+                  <span>Описание</span>
                   <textarea
                     rows={2}
                     value={createForm.description}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="РљСЂР°С‚РєРѕ: СѓРїР°РєРѕРІРєР°, СЃСЂРѕРє РїРѕСЃС‚Р°РІРєРё, СѓСЃР»РѕРІРёСЏ"
+                    placeholder="Кратко: упаковка, срок поставки, условия"
                   />
                 </label>
                 <label className="publication-field">
@@ -718,7 +719,7 @@ export default function PublicationsScreen({
                     checked={createForm.inStock}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, inStock: e.target.checked }))}
                   />
-                  Р’ РЅР°Р»РёС‡РёРё
+                  В наличии
                 </label>
                 <label>
                   <input
@@ -726,11 +727,11 @@ export default function PublicationsScreen({
                     checked={createForm.trackInventory}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, trackInventory: e.target.checked }))}
                   />
-                  РЈС‡РµС‚ РѕСЃС‚Р°С‚РєРѕРІ
+                  Учет остатков
                 </label>
                 {createForm.trackInventory ? (
                   <label className="publication-field publication-field--stock">
-                    <span>РћСЃС‚Р°С‚РѕРє</span>
+                    <span>Остаток</span>
                     <input
                       inputMode="decimal"
                       value={createForm.stockQty}
@@ -743,28 +744,28 @@ export default function PublicationsScreen({
 
               <div className="publication-create-actions">
                 <button type="button" className="publication-primary-btn" onClick={handleCreate} disabled={creating}>
-                  {creating ? "РЎРѕР·РґР°РЅРёРµ..." : "РЎРѕР·РґР°С‚СЊ РїСѓР±Р»РёРєР°С†РёСЋ"}
+                  {creating ? "Создание..." : "Создать публикацию"}
                 </button>
               </div>
             </div>
           ) : null}
 
           <div className="search-box publications-search">
-            <span>рџ”Ћ</span>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="РџРѕРёСЃРє РїРѕ SKU, РѕРїРёСЃР°РЅРёСЋ, РєР°С‚РµРіРѕСЂРёРё" />
+            <span>🔎</span>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по SKU, описанию, категории" />
             {search ? (
               <button className="clear-search" type="button" onClick={() => setSearch("")}>
-                Г—
+                ×
               </button>
             ) : null}
           </div>
 
           <div className="publications-filters">
             {[
-              { key: "all", label: `Р’СЃРµ (${stats.all})` },
-              { key: "in_stock", label: `Р’ РЅР°Р»РёС‡РёРё (${stats.inStock})` },
-              { key: "out_stock", label: `РќРµС‚ РІ РЅР°Р»РёС‡РёРё (${stats.outOfStock})` },
-              { key: "low_stock", label: `Р—Р°РєР°РЅС‡РёРІР°СЋС‚СЃСЏ (${stats.lowStock})` },
+              { key: "all", label: `Все (${stats.all})` },
+              { key: "in_stock", label: `В наличии (${stats.inStock})` },
+              { key: "out_stock", label: `Нет в наличии (${stats.outOfStock})` },
+              { key: "low_stock", label: `Заканчиваются (${stats.lowStock})` },
             ].map((chip) => (
               <button
                 key={chip.key}
@@ -779,22 +780,22 @@ export default function PublicationsScreen({
 
           {loading ? (
             <div className="publications-empty">
-              <div className="publications-empty-title">Р—Р°РіСЂСѓР·РєР° РїСѓР±Р»РёРєР°С†РёР№...</div>
+              <div className="publications-empty-title">Загрузка публикаций...</div>
             </div>
           ) : errorText ? (
             <div className="publications-empty">
-              <div className="publications-empty-title">РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РґР°РЅРЅС‹Рµ</div>
+              <div className="publications-empty-title">Не удалось загрузить данные</div>
               <div className="publications-empty-text">{errorText}</div>
               {onPickCompany ? (
                 <button type="button" className="publication-primary-btn" onClick={onPickCompany}>
-                  Р’С‹Р±СЂР°С‚СЊ РґСЂСѓРіСѓСЋ РєРѕРјРїР°РЅРёСЋ
+                  Выбрать другую компанию
                 </button>
               ) : null}
             </div>
           ) : filtered.length === 0 ? (
             <div className="publications-empty">
-              <div className="publications-empty-title">РќРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ</div>
-              <div className="publications-empty-text">РР·РјРµРЅРёС‚Рµ С„РёР»СЊС‚СЂ РёР»Рё РґРѕР±Р°РІСЊС‚Рµ РЅРѕРІСѓСЋ РїСѓР±Р»РёРєР°С†РёСЋ.</div>
+              <div className="publications-empty-title">Ничего не найдено</div>
+              <div className="publications-empty-text">Измените фильтр или добавьте новую публикацию.</div>
             </div>
           ) : (
             <div className="publications-list publications-list--work">
@@ -803,26 +804,42 @@ export default function PublicationsScreen({
                 const changed = hasChanges(product);
                 const busy = savingId === product.id || deletingId === product.id;
                 const lowStock = isLowStock(product, draft);
+                const isExpanded = expandedProductId === product.id;
                 return (
-                  <article key={product.id} className="publication-work-card">
+                  <article key={product.id} className={`publication-work-card ${isExpanded ? "is-expanded" : "is-collapsed"}`}>
                     <div className="publication-work-head">
-                      <div>
+                      <div className="publication-work-summary">
                         <div className="publication-title">{product.name}</div>
                         <div className="publication-subtitle">
-                          {product.categoryName || "Р‘РµР· РєР°С‚РµРіРѕСЂРёРё"} вЂў {product.unit || "С€С‚"} вЂў РјРёРЅ. Р·Р°РєР°Р· {product.minQty}
+                          {product.categoryName || "Без категории"} • {product.unit || "шт"} • мин. заказ {product.minQty}
+                        </div>
+                        <div className="publication-work-quickmeta">
+                          <span>{`Цена: ${draft.price || "—"} сом`}</span>
+                          {draft.trackInventory ? <span>{`Остаток: ${draft.stockQty || "0"}`}</span> : <span>Учет склада выкл</span>}
+                          {changed ? <span className="is-dirty">Есть изменения</span> : null}
                         </div>
                       </div>
-                      <div className="publication-status-wrap">
-                        <span className={`publication-status ${draft.inStock ? "publication-status--active" : "publication-status--archive"}`}>
-                          {draft.inStock ? "Р’ РЅР°Р»РёС‡РёРё" : "РќРµС‚ РІ РЅР°Р»РёС‡РёРё"}
-                        </span>
-                        {lowStock ? <span className="publication-status publication-status--draft">РњР°Р»Рѕ РѕСЃС‚Р°С‚РєР°</span> : null}
+                      <div className="publication-work-side">
+                        <div className="publication-status-wrap">
+                          <span className={`publication-status ${draft.inStock ? "publication-status--active" : "publication-status--archive"}`}>
+                            {draft.inStock ? "В наличии" : "Нет в наличии"}
+                          </span>
+                          {lowStock ? <span className="publication-status publication-status--draft">Мало остатка</span> : null}
+                        </div>
+                        <button
+                          type="button"
+                          className={`publication-expand-btn ${isExpanded ? "is-open" : ""}`}
+                          onClick={() => setExpandedProductId((current) => (current === product.id ? null : product.id))}
+                          aria-expanded={isExpanded}
+                        >
+                          {isExpanded ? "Свернуть" : "Открыть"}
+                        </button>
                       </div>
                     </div>
 
-                    <div className="publication-work-grid">
+                    {isExpanded ? <div className="publication-work-grid">
                       <label className="publication-field">
-                        <span>Р¦РµРЅР° (СЃРѕРј)</span>
+                        <span>Цена (сом)</span>
                         <input
                           inputMode="decimal"
                           value={draft.price}
@@ -928,49 +945,49 @@ export default function PublicationsScreen({
                       </label>
 
                       <label className="publication-field">
-                        <span>РќР°Р»РёС‡РёРµ</span>
+                        <span>Наличие</span>
                         <button
                           type="button"
                           className={`publication-toggle ${draft.inStock ? "is-on" : ""}`}
                           onClick={() => onDraftChange(product.id, { inStock: !draft.inStock })}
                           disabled={busy}
                         >
-                          {draft.inStock ? "Р’РєР»СЋС‡РµРЅРѕ" : "Р’С‹РєР»СЋС‡РµРЅРѕ"}
+                          {draft.inStock ? "Включено" : "Выключено"}
                         </button>
                       </label>
 
                       <label className="publication-field">
-                        <span>РЈС‡РµС‚ СЃРєР»Р°РґР°</span>
+                        <span>Учет склада</span>
                         <button
                           type="button"
                           className={`publication-toggle ${draft.trackInventory ? "is-on" : ""}`}
                           onClick={() => onDraftChange(product.id, { trackInventory: !draft.trackInventory })}
                           disabled={busy}
                         >
-                          {draft.trackInventory ? "Р’РєР»СЋС‡РµРЅРѕ" : "Р’С‹РєР»СЋС‡РµРЅРѕ"}
+                          {draft.trackInventory ? "Включено" : "Выключено"}
                         </button>
                       </label>
 
                       <label className="publication-field">
-                        <span>РћСЃС‚Р°С‚РѕРє</span>
+                        <span>Остаток</span>
                         <input
                           inputMode="decimal"
                           value={draft.stockQty}
                           onChange={(e) => onDraftChange(product.id, { stockQty: e.target.value })}
                           disabled={!draft.trackInventory || busy}
-                          placeholder={draft.trackInventory ? "0" : "РЈС‡РµС‚ РІС‹РєР»СЋС‡РµРЅ"}
+                          placeholder={draft.trackInventory ? "0" : "Учет выключен"}
                         />
                       </label>
-                    </div>
+                    </div> : null}
 
-                    <div className="publication-work-actions">
+                    {isExpanded ? <div className="publication-work-actions">
                       <button
                         type="button"
                         className="publication-primary-btn"
                         disabled={!changed || busy}
                         onClick={() => handleSave(product)}
                       >
-                        {savingId === product.id ? "РЎРѕС…СЂР°РЅРµРЅРёРµ..." : "РЎРѕС…СЂР°РЅРёС‚СЊ"}
+                        {savingId === product.id ? "Сохранение..." : "Сохранить"}
                       </button>
                       <button
                         type="button"
@@ -978,9 +995,9 @@ export default function PublicationsScreen({
                         disabled={busy}
                         onClick={() => handleDelete(product)}
                       >
-                        {deletingId === product.id ? "РЈРґР°Р»РµРЅРёРµ..." : "РЈРґР°Р»РёС‚СЊ"}
+                        {deletingId === product.id ? "Удаление..." : "Удалить"}
                       </button>
-                    </div>
+                    </div> : null}
                   </article>
                 );
               })}

@@ -23,6 +23,7 @@ export type Order = {
   id: number;
   status: string;
   createdAt?: string | null;
+  deliveryAddress?: string | null;
   comment?: string | null;
   buyerCompanyId?: number | null;
   supplierCompanyId?: number | null;
@@ -43,6 +44,7 @@ type ApiOrder = {
   id: number;
   status: string;
   created_at?: string | null;
+  delivery_address?: string | null;
   comment?: string | null;
   buyer_company_id?: number;
   supplier_company_id?: number;
@@ -60,6 +62,7 @@ type OrderListRowApi = {
   id: number;
   status: string;
   created_at: string | null;
+  delivery_address: string | null;
   comment: string | null;
   items_count: number | null;
   total: number | null;
@@ -69,6 +72,7 @@ type OrderDetailApi = {
   id: number;
   status: string;
   created_at: string | null;
+  delivery_address: string | null;
   comment: string | null;
   buyer_company_id: number;
   supplier_company_id: number;
@@ -127,6 +131,7 @@ function normalizeListRow(x: OrderListRowApi): Order {
     id: x.id,
     status: normalizeStatus(x.status),
     createdAt: x.created_at,
+    deliveryAddress: x.delivery_address,
     comment: x.comment,
     buyerCompanyId: null,
     supplierCompanyId: null,
@@ -141,6 +146,7 @@ function normalizeDetail(x: OrderDetailApi): Order {
     id: x.id,
     status: normalizeStatus(x.status),
     createdAt: x.created_at,
+    deliveryAddress: x.delivery_address,
     comment: x.comment,
     buyerCompanyId: x.buyer_company_id,
     supplierCompanyId: x.supplier_company_id,
@@ -172,6 +178,7 @@ function normalizeFullOrder(x: ApiOrder): Order {
     id: x.id,
     status: normalizeStatus(x.status),
     createdAt: x.created_at ?? null,
+    deliveryAddress: x.delivery_address ?? null,
     comment: x.comment ?? null,
     buyerCompanyId: x.buyer_company_id ?? null,
     supplierCompanyId: x.supplier_company_id ?? null,

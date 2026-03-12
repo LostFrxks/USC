@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Product } from "../types";
 
 type ProductDetailFact = { label: string; value: string };
@@ -31,32 +32,33 @@ export default function ProductDetailsSheet({
   onClose: () => void;
   onAdd: () => void;
 }) {
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setPortalRoot(document.body);
+  }, []);
+
   useEffect(() => {
     if (!product) return;
 
     const prevOverflow = document.body.style.overflow;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-
     document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKeyDown);
 
     return () => {
       document.body.style.overflow = prevOverflow;
-      window.removeEventListener("keydown", onKeyDown);
     };
-  }, [product, onClose]);
+  }, [product]);
 
   const detailFacts = useMemo(() => (product ? buildDetailFacts(product) : []), [product]);
 
-  if (!product) return null;
+  if (!product || !portalRoot) return null;
 
-  const priceText = typeof product.price === "number" && product.price > 0
-    ? `${Math.round(product.price).toLocaleString("ru-RU")} сом`
-    : "по запросу";
+  const priceText =
+    typeof product.price === "number" && product.price > 0
+      ? `${Math.round(product.price).toLocaleString("ru-RU")} сом`
+      : "по запросу";
 
-  return (
+  return createPortal(
     <div className="product-sheet-overlay" onClick={onClose}>
       <section className="product-sheet" onClick={(event) => event.stopPropagation()}>
         <div className="product-sheet-handle" aria-hidden="true" />
@@ -120,6 +122,7 @@ export default function ProductDetailsSheet({
           </div>
         </div>
       </section>
-    </div>
+    </div>,
+    portalRoot
   );
 }

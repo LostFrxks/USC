@@ -6,12 +6,14 @@ export type OnboardingScreen = "home" | "cart" | "analytics" | "ai" | "profile";
 
 export type OnboardingStep = {
   id: string;
+  eyebrow?: string;
   title: string;
   description: string;
   mode: OnboardingMode;
   screen?: OnboardingScreen;
   targetSelector?: string;
   actionHint?: string;
+  accent?: "brand" | "action" | "insight" | "success";
 };
 
 export type OnboardingStorageContext = {
@@ -28,4 +30,3 @@ export type OnboardingPersistedState = {
   storageSchemaVersion: number;
   guideContentVersion: string;
 };
-

@@ -9,29 +9,32 @@ export function useProducts(categoryId: number | null, query: string) {
 
   useEffect(() => {
     let alive = true;
-    setLoading(true);
 
-    fetchProducts({ categoryId: categoryId ?? undefined, q: query || undefined })
-      .then((data) => {
-        if (!alive) return;
-        setApiProducts(data);
-        setApiOk(true);
-      })
-      .catch(() => {
-        if (!alive) return;
-        setApiOk(false);
-        setApiProducts([]);
-      })
-      .finally(() => {
-        if (!alive) return;
-        setLoading(false);
-      });
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+
+      fetchProducts({ categoryId: categoryId ?? undefined, q: query || undefined })
+        .then((data) => {
+          if (!alive) return;
+          setApiProducts(data);
+          setApiOk(true);
+        })
+        .catch(() => {
+          if (!alive) return;
+          setApiOk(false);
+          setApiProducts([]);
+        })
+        .finally(() => {
+          if (!alive) return;
+          setLoading(false);
+        });
+    }, 140);
 
     return () => {
       alive = false;
+      window.clearTimeout(timer);
     };
   }, [categoryId, query]);
 
-  // теперь демо-фоллбек можно убрать или оставить на будущее
   return { products: apiProducts, loading, apiOk, apiEmpty: apiOk && apiProducts.length === 0 };
 }

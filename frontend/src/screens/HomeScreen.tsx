@@ -1,9 +1,10 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Category, Product } from "../types";
 import TopHeader from "../ui/TopHeader";
 import { ProductCard, ProductCardSkeleton } from "../ui/ProductCard";
 import ProductDetailsSheet from "../ui/ProductDetailsSheet";
 import { useProducts } from "../hooks/useProducts";
+import { preloadImages } from "../utils/imagePreload";
 
 const CATEGORIES: Array<{
   key: Category;
@@ -50,6 +51,7 @@ export default function HomeScreen({
   onAdd,
   showCompanyBanner = false,
   onPickCompany,
+  onCategoryChange,
 }: {
   active: boolean;
   cartCount: number;
@@ -57,46 +59,30 @@ export default function HomeScreen({
   onAdd: (product: Product) => void;
   showCompanyBanner?: boolean;
   onPickCompany?: () => void;
+  onCategoryChange?: (category: Category) => void;
 }) {
   const [category, setCategory] = useState<Category>("meat");
   const [query, setQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const categoryId = CATEGORY_TO_ID[category];
-  const { products, loading } = useProducts(categoryId, query.trim());
-
-  const categoriesRef = useRef<HTMLDivElement | null>(null);
+  const deferredQuery = useDeferredValue(query.trim());
+  const { products, loading } = useProducts(categoryId, deferredQuery);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-
-  const loopItems = useMemo(() => {
-    const base = [{ kind: "search" as const }, ...CATEGORIES.map((c) => ({ kind: "cat" as const, ...c }))];
-    return [...base, ...base, ...base];
-  }, []);
-
-  useEffect(() => {
-    const el = categoriesRef.current;
-    if (!el) return;
-
-    requestAnimationFrame(() => {
-      const third = el.scrollWidth / 3;
-      el.scrollLeft = third;
-    });
-
-    const onScroll = () => {
-      const third = el.scrollWidth / 3;
-      if (el.scrollLeft < third * 0.3) el.scrollLeft += third;
-      else if (el.scrollLeft > third * 1.7) el.scrollLeft -= third;
-    };
-
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, []);
 
   useEffect(() => {
     if (!active) setSelectedProduct(null);
   }, [active]);
 
+  useEffect(() => {
+    onCategoryChange?.(category);
+  }, [category, onCategoryChange]);
+
   const filteredProducts = useMemo(() => products ?? [], [products]);
+
+  useEffect(() => {
+    preloadImages(filteredProducts.slice(0, 4).map((product) => product.image));
+  }, [filteredProducts]);
 
   return (
     <section id="screen-home" data-testid="screen-home" className={`screen ${active ? "active" : ""}`}>
@@ -119,7 +105,7 @@ export default function HomeScreen({
           <img src="/media/usc.svg" alt="USC" className="logo" />
         </div>
 
-        <div className="search-box home-inline-search">
+        <div className="search-box home-inline-search" data-tour-id="home-search-box">
           <button className="icon-button" type="button" aria-label="Поиск">
             <img src="/media/search.png" alt="Поиск" />
           </button>
@@ -135,26 +121,16 @@ export default function HomeScreen({
           </button>
         </div>
 
-        <div className="categories" ref={categoriesRef}>
-          {loopItems.map((item, idx) => {
-            if (item.kind === "search") {
-              return (
-                <button
-                  key={`search-${idx}`}
-                  className="category category-search"
-                  type="button"
-                  onClick={() => searchInputRef.current?.focus()}
-                >
-                  <img src="/media/search.png" alt="Поиск" style={{ width: 40, height: 40, borderRadius: 999 }} />
-                </button>
-              );
-            }
-
+        <div className="categories" data-tour-id="home-categories">
+          <button className="category category-search" type="button" onClick={() => searchInputRef.current?.focus()}>
+            <img src="/media/search.png" alt="Поиск" style={{ width: 40, height: 40, borderRadius: 999 }} />
+          </button>
+          {CATEGORIES.map((item) => {
             const isActive = category === item.key;
 
             return (
               <button
-                key={`${item.key}-${idx}`}
+                key={item.key}
                 className={`category ${isActive ? "active" : ""}`}
                 style={item.btnStyle}
                 onClick={() => setCategory(item.key)}
@@ -195,6 +171,7 @@ export default function HomeScreen({
                 product={p}
                 onAdd={() => onAdd(p)}
                 onOpen={() => setSelectedProduct(p)}
+                priority={idx < 4}
               />
             ))
           )}

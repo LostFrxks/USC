@@ -3,6 +3,7 @@ import type { Product } from "../types";
 import { ProductCard, ProductCardSkeleton } from "../ui/ProductCard";
 import ProductDetailsSheet from "../ui/ProductDetailsSheet";
 import { useSupplierProducts } from "../hooks/useSupplierProducts";
+import { preloadImages } from "../utils/imagePreload";
 
 export default function SupplierScreen({
   active,
@@ -33,6 +34,10 @@ export default function SupplierScreen({
   }, [active]);
 
   const { products, loading, apiOk, apiEmpty } = useSupplierProducts(supplierId, debounced);
+
+  useEffect(() => {
+    preloadImages(products.slice(0, 4).map((product) => product.image));
+  }, [products]);
 
   return (
     <section id="screen-supplier" className={`screen ${active ? "active" : ""}`}>
@@ -106,7 +111,15 @@ export default function SupplierScreen({
                   ))}
                 </>
               ) : (
-                products.map((p) => <ProductCard key={p.id} product={p} onAdd={() => onAdd(p)} onOpen={() => setSelectedProduct(p)} />)
+                products.map((p, idx) => (
+                  <ProductCard
+                    key={p.id}
+                    product={p}
+                    onAdd={() => onAdd(p)}
+                    onOpen={() => setSelectedProduct(p)}
+                    priority={idx < 4}
+                  />
+                ))
               )}
             </div>
           )}

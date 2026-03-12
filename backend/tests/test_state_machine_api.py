@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from backend.tests.test_helpers import (
+from tests.test_helpers import (
     auth_headers,
     seed_company,
     seed_delivery,
@@ -49,10 +49,10 @@ def test_supplier_confirm_rejects_invalid_order_transition(client, db_session):
 
 
 def test_delivery_set_status_rejects_invalid_transition(client, db_session):
-    seed_user(db_session, user_id=1, email="buyer@test.local")
+    seed_user(db_session, user_id=1, email="supplier@test.local")
     seed_company(db_session, company_id=10, name="Buyer", company_type="BUYER")
     seed_company(db_session, company_id=20, name="Supplier", company_type="SUPPLIER")
-    seed_membership(db_session, member_id=1, user_id=1, company_id=10)
+    seed_membership(db_session, member_id=1, user_id=1, company_id=20, role="MANAGER")
     seed_order(
         db_session,
         order_id=600,
@@ -66,7 +66,7 @@ def test_delivery_set_status_rejects_invalid_transition(client, db_session):
     response = client.post(
         "/api/deliveries/700/set_status/",
         json={"status": "DELIVERED"},
-        headers=auth_headers(1, "buyer@test.local"),
+        headers=auth_headers(1, "supplier@test.local"),
     )
 
     assert response.status_code == 409

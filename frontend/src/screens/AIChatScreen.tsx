@@ -29,6 +29,7 @@ const MAX_SESSIONS = 60;
 const MAX_MESSAGES_PER_SESSION = 180;
 const TECH_TOKEN_RE = /\banalytics_modules(?:\.[\w-]+)+:?/gi;
 const QUOTED_TOKEN_RE = /[«"“”]\s*([A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9 _/-]{0,40})\s*[»"“”]/g;
+const ONBOARDING_MARKET_PROMPT = "Какие сейчас общие тренды рынка и на что нашей компании стоит смотреть в ближайший месяц?";
 
 function sessionKey(companyId: number | null | undefined, role: string | null | undefined) {
   return `usc.ai.sessions.${companyId ?? "none"}.${(role ?? "unknown").toLowerCase()}`;
@@ -126,6 +127,8 @@ export default function AIChatScreen({
   companyId,
   showCompanyBanner = false,
   onPickCompany,
+  onboardingPromptEnabled = false,
+  onOnboardingAnswerReady,
 }: {
   active: boolean;
   cartCount: number;
@@ -135,6 +138,8 @@ export default function AIChatScreen({
   companyId?: number | null;
   showCompanyBanner?: boolean;
   onPickCompany?: () => void;
+  onboardingPromptEnabled?: boolean;
+  onOnboardingAnswerReady?: (ready: boolean) => void;
 }) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -149,9 +154,18 @@ export default function AIChatScreen({
   const revealTimerRef = useRef<number | null>(null);
   const activeMessagesRef = useRef<ChatMessage[]>([]);
   const lastSessionIdRef = useRef<string | null>(null);
+  const onboardingSeedRef = useRef<string | null>(null);
+  const onboardingSessionIdRef = useRef<string | null>(null);
 
   const key = useMemo(() => sessionKey(companyId, role), [companyId, role]);
   const analyticsRole = (role || "").toLowerCase() === "supplier" ? "supplier" : "buyer";
+  const onboardingAnswerReady = useMemo(() => {
+    const onboardingSessionId = onboardingSessionIdRef.current;
+    if (!onboardingPromptEnabled || !onboardingSessionId) return false;
+    const onboardingSession = sessions.find((session) => session.id === onboardingSessionId);
+    if (!onboardingSession) return false;
+    return onboardingSession.messages.some((message) => message.role === "assistant" && message.text.trim().length > 0);
+  }, [onboardingPromptEnabled, sessions]);
 
   useEffect(() => {
     try {
@@ -257,6 +271,39 @@ export default function AIChatScreen({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!active || !onboardingPromptEnabled || !companyId) return;
+    const seedKey = `${companyId}:${analyticsRole}`;
+    if (onboardingSeedRef.current === seedKey) return;
+
+    const now = Date.now();
+    const chatId = makeId("chat");
+    const next: ChatSession = {
+      id: chatId,
+      title: makeTitle(ONBOARDING_MARKET_PROMPT),
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+    };
+
+    onboardingSeedRef.current = seedKey;
+    onboardingSessionIdRef.current = chatId;
+    setSessions((prev) => [next, ...prev].slice(0, MAX_SESSIONS));
+    setCurrentId(chatId);
+    setInput(ONBOARDING_MARKET_PROMPT);
+    setMobileSidebarOpen(false);
+  }, [active, analyticsRole, companyId, onboardingPromptEnabled]);
+
+  useEffect(() => {
+    if (onboardingPromptEnabled) return;
+    onboardingSeedRef.current = null;
+    onboardingSessionIdRef.current = null;
+  }, [onboardingPromptEnabled]);
+
+  useEffect(() => {
+    onOnboardingAnswerReady?.(onboardingAnswerReady);
+  }, [onboardingAnswerReady, onOnboardingAnswerReady]);
 
   useEffect(() => {
     if (!currentSession) return;
@@ -449,6 +496,7 @@ export default function AIChatScreen({
       }));
       if (typeof res.chat_session_id === "number") {
         const newSessionId = `srv-${res.chat_session_id}`;
+        if (onboardingSessionIdRef.current === targetId) onboardingSessionIdRef.current = newSessionId;
         setCurrentId((curr) => (curr === targetId ? newSessionId : curr));
         targetRemoteId = res.chat_session_id;
       }
@@ -614,6 +662,13 @@ export default function AIChatScreen({
                 </div>
               )}
             </div>
+            {onboardingPromptEnabled ? (
+              <div className={`ai-onboarding-note ${onboardingAnswerReady ? "is-ready" : ""}`}>
+                {onboardingAnswerReady
+                  ? "Ответ AI уже готов. Можно идти дальше или отредактировать вопрос и спросить по-своему."
+                  : "Мы уже подставили стартовый вопрос по рынку. Его можно оставить как есть или переписать под свою задачу."}
+              </div>
+            ) : null}
             <form
               className="ai-input-row"
               data-tour-id="ai-input-row"

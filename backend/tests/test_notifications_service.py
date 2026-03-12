@@ -8,7 +8,7 @@ from app.services.notifications import (
     mark_all_notifications_read,
     mark_notification_read,
 )
-from backend.tests.test_helpers import seed_user
+from tests.test_helpers import seed_user
 
 
 def test_create_and_list_notifications(db_session):

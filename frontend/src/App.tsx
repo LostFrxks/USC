@@ -74,6 +74,8 @@ export default function App() {
   const [searchPreset, setSearchPreset] = useState<{ categoryId: number | null }>({ categoryId: null });
   const [cartCheckoutOpen, setCartCheckoutOpen] = useState(false);
   const [tourTargetFound, setTourTargetFound] = useState(false);
+  const [homeCategoryTouched, setHomeCategoryTouched] = useState(false);
+  const [aiOnboardingAnswered, setAiOnboardingAnswered] = useState(false);
 
   const [splashAnimationDone, setSplashAnimationDone] = useState(!initialAuthed);
   const handleSessionExpired = useCallback(() => {
@@ -196,6 +198,9 @@ export default function App() {
     let alive = true;
     let timer: number | null = null;
     const load = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
       if (!localStorage.getItem("usc_access_token")) {
         alive = false;
         if (timer != null) window.clearInterval(timer);
@@ -221,9 +226,16 @@ export default function App() {
 
     load();
     timer = window.setInterval(load, 20000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        load();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       alive = false;
       if (timer != null) window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [authed, handleSessionExpired]);
 
@@ -284,19 +296,30 @@ export default function App() {
   });
 
   const onboardingStep = onboarding.isRunning ? ONBOARDING_STEPS[onboarding.stepIndex] ?? null : null;
+  const onboardingCartDemoMode =
+    onboarding.isRunning &&
+    (onboardingStep?.id === "tab_cart" || onboardingStep?.id === "cart_checkout" || onboardingStep?.id === "checkout_map");
+  const onboardingAiPromptMode = onboarding.isRunning && onboardingStep?.id === "ai_assistant";
 
   const onboardingStepCompleted = useMemo(() => {
     if (!onboardingStep) return false;
+    if (onboardingStep.id === "ai_assistant") return activeTab === "ai" && aiOnboardingAnswered;
     if (onboardingStep.mode !== "interaction_required") return true;
     if (onboardingStep.id === "open_drawer") return drawerOpen;
+    if (onboardingStep.id === "home_category") return homeCategoryTouched;
+    if (onboardingStep.id === "tab_cart") return activeTab === "cart";
     if (onboardingStep.id === "cart_checkout") return activeTab === "cart" && cartCheckoutOpen;
+    if (onboardingStep.id === "tab_analytics") return activeTab === "analytics";
+    if (onboardingStep.id === "tab_ai") return activeTab === "ai";
+    if (onboardingStep.id === "tab_profile") return activeTab === "profile";
     return false;
-  }, [activeTab, cartCheckoutOpen, drawerOpen, onboardingStep]);
+  }, [activeTab, aiOnboardingAnswered, cartCheckoutOpen, drawerOpen, homeCategoryTouched, onboardingStep]);
 
   const onboardingCanGoNext = useMemo(() => {
     if (!onboardingStep) return false;
-    if (onboardingStep.mode !== "interaction_required") return true;
     const targetMissing = !!onboardingStep.targetSelector && !tourTargetFound;
+    if (onboardingStep.id === "ai_assistant") return onboardingStepCompleted || targetMissing;
+    if (onboardingStep.mode !== "interaction_required") return true;
     return onboardingStepCompleted || targetMissing;
   }, [onboardingStep, onboardingStepCompleted, tourTargetFound]);
 
@@ -357,6 +380,15 @@ export default function App() {
   useEffect(() => {
     setTourTargetFound(false);
   }, [onboardingStep?.id]);
+
+  useEffect(() => {
+    if (onboardingStep?.id === "ai_assistant") return;
+    setAiOnboardingAnswered(false);
+  }, [onboardingStep?.id]);
+
+  useEffect(() => {
+    setHomeCategoryTouched(false);
+  }, [onboardingContext?.userId, onboardingContext?.companyId, onboardingContext?.role]);
 
   useEffect(() => {
     if (!onboarding.isRunning || !onboardingStep) return;
@@ -488,6 +520,9 @@ export default function App() {
           onAdd={addToCart}
           showCompanyBanner={!!needsCompany}
           onPickCompany={() => setCompanyPickerOpen(true)}
+          onCategoryChange={(nextCategory) => {
+            if (nextCategory !== "meat") setHomeCategoryTouched(true);
+          }}
         />
 
         <SearchScreen
@@ -519,6 +554,8 @@ export default function App() {
           companyId={companyId}
           showCompanyBanner={!!needsCompany}
           onPickCompany={() => setCompanyPickerOpen(true)}
+          onboardingPromptEnabled={onboardingAiPromptMode}
+          onOnboardingAnswerReady={setAiOnboardingAnswered}
         />
 
         <CartScreen
@@ -535,6 +572,7 @@ export default function App() {
           onCheckoutOpenChange={setCartCheckoutOpen}
           buyerCompanyId={companyId}
           onNotify={toast.show}
+          onboardingDemoMode={onboardingCartDemoMode}
         />
 
         <ProfileScreen

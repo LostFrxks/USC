@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
+Ôªøimport { useEffect, useState } from "react";
 import { login, registerEmail, requestEmailCode, requestPhoneCode, verifyPhoneCode } from "../api/auth";
 import { logger } from "../utils/logger";
 
 type Role = "buyer" | "supplier";
-
 type AuthMode = "login" | "register";
-
 type LoginMethod = "email" | "phone";
 
 type AuthErrorDetail = {
@@ -96,7 +94,7 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
   const isEmailValid = (value: string) => /.+@.+\..+/.test(value.trim());
   const isPhoneValid = (value: string) => value.replace(/[^0-9+]/g, "").length >= 6;
 
-    const mapError = (e: unknown) => {
+  const mapError = (e: unknown) => {
     const text = String(e);
     let parsed: AuthErrorDetail | null = null;
     const payloadStart = text.indexOf("{");
@@ -110,24 +108,24 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
 
     if (parsed?.lockout_seconds && parsed.lockout_seconds > 0) setLockoutSeconds(parsed.lockout_seconds);
     if (parsed?.captcha_required) setCaptchaRequired(true);
-    if (parsed?.reason_code === "locked_out") return "—ÎË¯ÍÓÏ ÏÌÓ„Ó ÔÓÔ˚ÚÓÍ. ¿ÍÍ‡ÛÌÚ ‚ÂÏÂÌÌÓ Á‡·ÎÓÍËÓ‚‡Ì.";
-    if (parsed?.reason_code === "captcha_required") return "“Â·ÛÂÚÒˇ captcha-ÔÓ‚ÂÍ‡.";
-    if (parsed?.reason_code === "rate_limited") return "—ÎË¯ÍÓÏ ÏÌÓ„Ó Á‡ÔÓÒÓ‚. œÓÔÓ·ÛÈÚÂ ÔÓÁÊÂ.";
+    if (parsed?.reason_code === "locked_out") return "–°–ª–∏—à–∫–æ–º –º–Ω–æ–≥–æ –ø–æ–ø—ã—Ç–æ–∫. –ê–∫–∫–∞—É–Ω—Ç –≤—Ä–µ–º–µ–Ω–Ω–æ –∑–∞–±–ª–æ–∫–∏—Ä–æ–≤–∞–Ω.";
+    if (parsed?.reason_code === "captcha_required") return "–¢—Ä–µ–±—É–µ—Ç—Å—è captcha-–ø—Ä–æ–≤–µ—Ä–∫–∞.";
+    if (parsed?.reason_code === "rate_limited") return "–°–ª–∏—à–∫–æ–º –º–Ω–æ–≥–æ –∑–∞–ø—Ä–æ—Å–æ–≤. –ü–æ–ø—Ä–æ–±—É–π—Ç–µ –ø–æ–∑–∂–µ.";
 
-    if (text.includes("Invalid email")) return "ÕÂÍÓÂÍÚÌ˚È email";
-    if (text.includes("Password too short")) return "œ‡ÓÎ¸ ÏËÌËÏÛÏ 6 ÒËÏ‚ÓÎÓ‚";
-    if (text.includes("Email code required")) return "“Â·ÛÂÚÒˇ ÍÓ‰ ËÁ email";
-    if (text.includes("Code not requested")) return "—Ì‡˜‡Î‡ Á‡ÔÓÒËÚÂ ÍÓ‰ Ì‡ email";
-    if (text.includes("Code expired")) return " Ó‰ ËÒÚÂÍ, Á‡ÔÓÒËÚÂ ÌÓ‚˚È";
-    if (text.includes("Invalid code")) return "ÕÂ‚ÂÌ˚È ÍÓ‰ ÔÓ‰Ú‚ÂÊ‰ÂÌËˇ";
-    if (text.includes("already exists")) return "“‡ÍÓÈ ‡ÍÍ‡ÛÌÚ ÛÊÂ ÒÛ˘ÂÒÚ‚ÛÂÚ";
-    if (text.includes("Failed to send email code")) return "ÕÂ Û‰‡ÎÓÒ¸ ÓÚÔ‡‚ËÚ¸ ÍÓ‰ Ì‡ ÔÓ˜ÚÛ";
-    if (text.includes("Email provider is not configured")) return "œÓ˜ÚÓ‚˚È ÒÂ‚ËÒ ÌÂ Ì‡ÒÚÓÂÌ";
-    if (text.includes("401")) return "ÕÂ‚ÂÌ˚È email ËÎË Ô‡ÓÎ¸";
-    if (text.includes("422")) return "œÓ‚Â¸ÚÂ ‰‡ÌÌ˚Â Ë ÔÓÔÓ·ÛÈÚÂ ÒÌÓ‚‡";
+    if (text.includes("Invalid email")) return "–ù–µ–∫–æ—Ä—Ä–µ–∫—Ç–Ω—ã–π email";
+    if (text.includes("Password too short")) return "–ü–∞—Ä–æ–ª—å –º–∏–Ω–∏–º—É–º 6 —Å–∏–º–≤–æ–ª–æ–≤";
+    if (text.includes("Email code required")) return "–¢—Ä–µ–±—É–µ—Ç—Å—è –∫–æ–¥ –∏–∑ email";
+    if (text.includes("Code not requested")) return "–°–Ω–∞—á–∞–ª–∞ –∑–∞–ø—Ä–æ—Å–∏—Ç–µ –∫–æ–¥ –Ω–∞ email";
+    if (text.includes("Code expired")) return "–ö–æ–¥ –∏—Å—Ç–µ–∫, –∑–∞–ø—Ä–æ—Å–∏—Ç–µ –Ω–æ–≤—ã–π";
+    if (text.includes("Invalid code")) return "–ù–µ–≤–µ—Ä–Ω—ã–π –∫–æ–¥ –ø–æ–¥—Ç–≤–µ—Ä–∂–¥–µ–Ω–∏—è";
+    if (text.includes("already exists")) return "–¢–∞–∫–æ–π –∞–∫–∫–∞—É–Ω—Ç —É–∂–µ —Å—É—â–µ—Å—Ç–≤—É–µ—Ç";
+    if (text.includes("Failed to send email code")) return "–ù–µ —É–¥–∞–ª–æ—Å—å –æ—Ç–ø—Ä–∞–≤–∏—Ç—å –∫–æ–¥ –Ω–∞ –ø–æ—á—Ç—É";
+    if (text.includes("Email provider is not configured")) return "–ü–æ—á—Ç–æ–≤—ã–π —Å–µ—Ä–≤–∏—Å –Ω–µ –Ω–∞—Å—Ç—Ä–æ–µ–Ω";
+    if (text.includes("401")) return "–ù–µ–≤–µ—Ä–Ω—ã–π email –∏–ª–∏ –ø–∞—Ä–æ–ª—å";
+    if (text.includes("422")) return "–ü—Ä–æ–≤–µ—Ä—å—Ç–µ –¥–∞–Ω–Ω—ã–µ –∏ –ø–æ–ø—Ä–æ–±—É–π—Ç–µ —Å–Ω–æ–≤–∞";
     if (text.includes("Register failed. DB says:")) {
       const suffix = text.split("Register failed. DB says:")[1]?.trim();
-      return suffix ? `DB: ${suffix}` : "Œ¯Ë·Í‡ ·‡Á˚ ÔË Â„ËÒÚ‡ˆËË";
+      return suffix ? `DB: ${suffix}` : "–û—à–∏–±–∫–∞ –±–∞–∑—ã –ø—Ä–∏ —Ä–µ–≥–∏—Å—Ç—Ä–∞—Ü–∏–∏";
     }
     return text;
   };
@@ -135,11 +133,11 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
   const submitLoginEmail = async () => {
     setMsg(null);
     if (lockoutSeconds > 0) {
-      setMsg(`œÓ‚ÚÓËÚÂ ˜ÂÂÁ ${lockoutSeconds} ÒÂÍ`);
+      setMsg(`–ü–æ–≤—Ç–æ—Ä–∏—Ç–µ —á–µ—Ä–µ–∑ ${lockoutSeconds} —Å–µ–∫`);
       return;
     }
     if (captchaRequired && !captchaToken.trim()) {
-      setMsg("¬‚Â‰ËÚÂ captcha token");
+      setMsg("–í–≤–µ–¥–∏—Ç–µ captcha token");
       return;
     }
     const email = loginEmailValue.trim().toLowerCase();
@@ -158,6 +156,28 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
       setCaptchaRequired(false);
       setCaptchaToken("");
       setLockoutSeconds(0);
+      onSuccess();
+    } catch (e) {
+      setMsg(mapError(e));
+      logger.error(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const loginWithTestAccount = async (email: string, password: string) => {
+    setMsg(null);
+    setAuthMode("login");
+    setMethod("email");
+    setLoginEmailValue(email);
+    setLoginPassword(password);
+    setCaptchaRequired(false);
+    setCaptchaToken("");
+    setLockoutSeconds(0);
+
+    try {
+      setBusy(true);
+      await login(email, password);
       onSuccess();
     } catch (e) {
       setMsg(mapError(e));
@@ -194,11 +214,11 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
   const verifyPhoneLoginCode = async () => {
     setMsg(null);
     if (lockoutSeconds > 0) {
-      setMsg(`œÓ‚ÚÓËÚÂ ˜ÂÂÁ ${lockoutSeconds} ÒÂÍ`);
+      setMsg(`–ü–æ–≤—Ç–æ—Ä–∏—Ç–µ —á–µ—Ä–µ–∑ ${lockoutSeconds} —Å–µ–∫`);
       return;
     }
     if (captchaRequired && !captchaToken.trim()) {
-      setMsg("¬‚Â‰ËÚÂ captcha token");
+      setMsg("–í–≤–µ–¥–∏—Ç–µ captcha token");
       return;
     }
     if (!loginPhone || !isPhoneValid(loginPhone) || !loginPhoneCode.trim()) {
@@ -307,11 +327,7 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
           <button type="button" className={`auth-mode-tab ${authMode === "login" ? "active" : ""}`} onClick={() => setAuthMode("login")}>
             –í—Ö–æ–¥
           </button>
-          <button
-            type="button"
-            className={`auth-mode-tab ${authMode === "register" ? "active" : ""}`}
-            onClick={() => setAuthMode("register")}
-          >
+          <button type="button" className={`auth-mode-tab ${authMode === "register" ? "active" : ""}`} onClick={() => setAuthMode("register")}>
             –†–µ–≥–∏—Å—Ç—Ä–∞—Ü–∏—è
           </button>
         </div>
@@ -331,43 +347,20 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
               <div className={`auth-panel ${method === "email" ? "active" : ""}`}>
                 <div className="auth-row">
                   <label>Email</label>
-                  <input
-                    data-testid="auth-login-email"
-                    type="email"
-                    value={loginEmailValue}
-                    onChange={(e) => setLoginEmailValue(e.target.value)}
-                    placeholder="seller@usc.market"
-                  />
+                  <input data-testid="auth-login-email" type="email" value={loginEmailValue} onChange={(e) => setLoginEmailValue(e.target.value)} placeholder="buyer1@usc.demo" />
                 </div>
                 <div className="auth-row">
                   <label>–ü–∞—Ä–æ–ª—å</label>
-                  <input
-                    data-testid="auth-login-password"
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢"
-                  />
+                  <input data-testid="auth-login-password" type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢" />
                 </div>
-                                {captchaRequired && (
+                {captchaRequired ? (
                   <div className="auth-row">
                     <label>Captcha token</label>
-                    <input
-                      type="text"
-                      value={captchaToken}
-                      onChange={(e) => setCaptchaToken(e.target.value)}
-                      placeholder="pass-captcha"
-                    />
+                    <input type="text" value={captchaToken} onChange={(e) => setCaptchaToken(e.target.value)} placeholder="pass-captcha" />
                   </div>
-                )}
-                {lockoutSeconds > 0 && <div className="auth-msg">{`¡ÎÓÍËÓ‚Í‡: ${lockoutSeconds} ÒÂÍ`}</div>}
-                <button
-                  className="primary-button"
-                  data-testid="auth-login-submit"
-                  type="button"
-                  onClick={submitLoginEmail}
-                  disabled={busy}
-                >
+                ) : null}
+                {lockoutSeconds > 0 ? <div className="auth-msg">{`–ë–ª–æ–∫–∏—Ä–æ–≤–∫–∞: ${lockoutSeconds} —Å–µ–∫`}</div> : null}
+                <button className="primary-button" data-testid="auth-login-submit" type="button" onClick={submitLoginEmail} disabled={busy}>
                   –í–æ–π—Ç–∏
                 </button>
               </div>
@@ -375,44 +368,25 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
               <div className={`auth-panel ${method === "phone" ? "active" : ""}`}>
                 <div className="auth-row">
                   <label>–¢–µ–ª–µ—Ñ–æ–Ω</label>
-                  <input
-                    type="tel"
-                    value={loginPhone}
-                    onChange={(e) => setLoginPhone(e.target.value)}
-                    placeholder="+996 ..."
-                  />
+                  <input type="tel" value={loginPhone} onChange={(e) => setLoginPhone(e.target.value)} placeholder="+996 ..." />
                 </div>
                 {!phoneCodeSent ? (
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={sendPhoneLoginCode}
-                    disabled={busy || phoneCooldown > 0}
-                  >
+                  <button className="primary-button" type="button" onClick={sendPhoneLoginCode} disabled={busy || phoneCooldown > 0}>
                     {phoneCooldown > 0 ? `–ü–æ–ª—É—á–∏—Ç—å –∫–æ–¥ (${phoneCooldown}—Å)` : "–ü–æ–ª—É—á–∏—Ç—å –∫–æ–¥"}
                   </button>
                 ) : (
                   <>
                     <div className="auth-row">
                       <label>–ö–æ–¥</label>
-                      <input
-                        value={loginPhoneCode}
-                        onChange={(e) => setLoginPhoneCode(e.target.value)}
-                        placeholder="123456"
-                      />
+                      <input value={loginPhoneCode} onChange={(e) => setLoginPhoneCode(e.target.value)} placeholder="123456" />
                     </div>
-                                        {captchaRequired && (
+                    {captchaRequired ? (
                       <div className="auth-row">
                         <label>Captcha token</label>
-                        <input
-                          type="text"
-                          value={captchaToken}
-                          onChange={(e) => setCaptchaToken(e.target.value)}
-                          placeholder="pass-captcha"
-                        />
+                        <input type="text" value={captchaToken} onChange={(e) => setCaptchaToken(e.target.value)} placeholder="pass-captcha" />
                       </div>
-                    )}
-                    {lockoutSeconds > 0 && <div className="auth-msg">{`¡ÎÓÍËÓ‚Í‡: ${lockoutSeconds} ÒÂÍ`}</div>}
+                    ) : null}
+                    {lockoutSeconds > 0 ? <div className="auth-msg">{`–ë–ª–æ–∫–∏—Ä–æ–≤–∫–∞: ${lockoutSeconds} —Å–µ–∫`}</div> : null}
                     <button className="primary-button" type="button" onClick={verifyPhoneLoginCode} disabled={busy}>
                       –í–æ–π—Ç–∏
                     </button>
@@ -442,18 +416,13 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
               </div>
               <div className="auth-row">
                 <label>–ü–∞—Ä–æ–ª—å</label>
-                <input
-                  type="password"
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  placeholder="‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢"
-                />
-                {regPassword.length > 0 && (
+                <input type="password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} placeholder="‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢‚Ä¢" />
+                {regPassword.length > 0 ? (
                   <div className="pwd-meter">
                     <div className={`pwd-bar level-${Math.min(passwordScore, 5)}`} />
                     <div className="pwd-label">{passwordLabel}</div>
                   </div>
-                )}
+                ) : null}
               </div>
               <div className="auth-row">
                 <label>–¢–µ–ª–µ—Ñ–æ–Ω (–æ–ø—Ü–∏–æ–Ω–∞–ª—å–Ω–æ)</label>
@@ -471,12 +440,7 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
               </div>
 
               {!emailCodeSent ? (
-                <button
-                  className="primary-button"
-                  type="button"
-                  onClick={sendRegisterEmailCode}
-                  disabled={busy || emailCooldown > 0}
-                >
+                <button className="primary-button" type="button" onClick={sendRegisterEmailCode} disabled={busy || emailCooldown > 0}>
                   {emailCooldown > 0 ? `–ü–æ–ª—É—á–∏—Ç—å –∫–æ–¥ (${emailCooldown}—Å)` : "–ü–æ–ª—É—á–∏—Ç—å –∫–æ–¥ –Ω–∞ email"}
                 </button>
               ) : (
@@ -497,18 +461,35 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
           </>
         )}
 
-        {msg && <div className="auth-msg">{msg}</div>}
+        {msg ? <div className="auth-msg">{msg}</div> : null}
 
         {authMode === "login" ? (
           <div className="auth-test-box">
-            <div className="auth-test-title">–¢–µ—Å—Ç–æ–≤—ã–µ –∞–∫–∫–∞—É–Ω—Ç—ã (–≤—Ä–µ–º–µ–Ω–Ω–æ)</div>
-            <div className="auth-test-subtitle">–î–ª—è –±—ã—Å—Ç—Ä–æ–≥–æ –≤—Ö–æ–¥–∞ –∏ –ø—Ä–æ–≤–µ—Ä–∫–∏ –∞–Ω–∞–ª–∏—Ç–∏–∫–∏. –ü–æ—Ç–æ–º —É–¥–∞–ª–∏–º.</div>
+            <div className="auth-test-head">
+              <div>
+                <div className="auth-test-title">–¢–µ—Å—Ç–æ–≤—ã–µ –∞–∫–∫–∞—É–Ω—Ç—ã</div>
+                <div className="auth-test-subtitle">–î–ª—è –±—ã—Å—Ç—Ä–æ–≥–æ –≤—Ö–æ–¥–∞ –∏ –ø—Ä–æ–≤–µ—Ä–∫–∏ –∞–Ω–∞–ª–∏—Ç–∏–∫–∏. –ü—Ä–æ–∫—Ä—É—Ç–∏—Ç–µ —Å–ø–∏—Å–æ–∫, –µ—Å–ª–∏ –Ω—É–∂–Ω–æ.</div>
+              </div>
+              <div className="auth-test-scrollhint" aria-hidden="true">
+                <span />
+              </div>
+            </div>
             <div className="auth-test-list">
               {TEST_ACCOUNTS.map((x) => (
                 <div key={x.email} className="auth-test-item">
-                  <div className="auth-test-main">
-                    <div className="auth-test-email">{x.email}</div>
-                    <div className="auth-test-pass">{`–ü–∞—Ä–æ–ª—å: ${x.password}`}</div>
+                  <div className="auth-test-top">
+                    <div className="auth-test-main">
+                      <div className="auth-test-email">{x.email}</div>
+                      <div className="auth-test-pass">{`–ü–∞—Ä–æ–ª—å: ${x.password}`}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="auth-test-login"
+                      disabled={busy}
+                      onClick={() => void loginWithTestAccount(x.email, x.password)}
+                    >
+                      –í–æ–π—Ç–∏
+                    </button>
                   </div>
                   <div className="auth-test-meta">
                     <span>{x.role}</span>
@@ -524,11 +505,3 @@ export default function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
     </section>
   );
 }
-
-
-
-
-
-
-
-

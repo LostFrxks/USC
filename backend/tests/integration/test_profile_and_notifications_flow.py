@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.services.notifications import create_notification_event
-from backend.tests.test_helpers import auth_headers, seed_company, seed_membership, seed_user
+from tests.test_helpers import auth_headers, seed_company, seed_membership, seed_user
 
 
 def test_profile_patch_returns_updated_profile(client, db_session):

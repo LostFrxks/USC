@@ -112,6 +112,9 @@ export type UpdateSupplierProductPayload = {
 
 const LIST_PRODUCTS = "/products/";
 const MY_SUPPLIER_PRODUCTS = "/products/my_supplier_products/";
+const PRODUCTS_TTL_MS = 60 * 1000;
+const productsCache = new Map<string, { data: Product[]; expiresAt: number }>();
+const productsInFlight = new Map<string, Promise<Product[]>>();
 
 function pickImage(p: ProductApi, categoryId: number | null): string {
   const key = String(p.category_name || "").toLowerCase();
@@ -230,9 +233,29 @@ export async function fetchProducts(params?: {
   if (params?.supplierId) qs.set("supplier_company", String(params.supplierId));
 
   const url = qs.toString() ? `${LIST_PRODUCTS}?${qs.toString()}` : LIST_PRODUCTS;
+  const now = Date.now();
+  const cached = productsCache.get(url);
+  if (cached && cached.expiresAt > now) {
+    return cached.data;
+  }
 
-  const page = await api<ApiPage<ProductApi>>(url, { auth: false });
-  return page.results.map(normalize);
+  const pending = productsInFlight.get(url);
+  if (pending) {
+    return pending;
+  }
+
+  const request = api<ApiPage<ProductApi>>(url, { auth: false })
+    .then((page) => {
+      const normalized = page.results.map(normalize);
+      productsCache.set(url, { data: normalized, expiresAt: Date.now() + PRODUCTS_TTL_MS });
+      return normalized;
+    })
+    .finally(() => {
+      productsInFlight.delete(url);
+    });
+
+  productsInFlight.set(url, request);
+  return request;
 }
 
 export async function fetchMySupplierProducts(companyId?: number | null): Promise<SupplierProduct[]> {

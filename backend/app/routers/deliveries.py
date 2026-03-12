@@ -60,11 +60,36 @@ def _user_ids_for_company(db: Session, company_id: int) -> list[int]:
     ]
 
 
+def _member_role_for_company(db: Session, user_id: int, company_id: int) -> str | None:
+    row = db.execute(
+        select(company_members.c.role).where(
+            company_members.c.user_id == int(user_id),
+            company_members.c.company_id == int(company_id),
+        )
+    ).first()
+    if not row or row[0] is None:
+        return None
+    return str(row[0]).upper()
+
+
 def _is_order_participant(db: Session, user_id: int, order_row: dict) -> bool:
     ids = _company_ids_for_user(db, user_id)
     if not ids:
         return False
     return int(order_row.get("buyer_company_id")) in ids or int(order_row.get("supplier_company_id")) in ids
+
+
+def _is_supplier_delivery_manager(db: Session, user_id: int, order_row: dict) -> bool:
+    supplier_company_id = int(order_row.get("supplier_company_id"))
+    return _member_role_for_company(db, user_id, supplier_company_id) in {"OWNER", "ADMIN", "MANAGER"}
+
+
+def _can_be_assigned_courier(db: Session, courier_id: int, order_row: dict) -> bool:
+    buyer_company_id = int(order_row.get("buyer_company_id"))
+    supplier_company_id = int(order_row.get("supplier_company_id"))
+    return _member_role_for_company(db, courier_id, buyer_company_id) is not None or _member_role_for_company(
+        db, courier_id, supplier_company_id
+    ) is not None
 
 
 def _invalidate_delivery_related_cache() -> None:
@@ -197,8 +222,8 @@ def upsert_for_order(payload: DeliveryUpsertPayload, user: dict = Depends(get_cu
     order_row = db.execute(select(orders).where(orders.c.id == payload.order)).mappings().first()
     if not order_row:
         raise HTTPException(404, detail="order not found")
-    if not _is_order_participant(db, u_id, dict(order_row)):
-        raise HTTPException(403, detail="Not allowed")
+    if not _is_supplier_delivery_manager(db, u_id, dict(order_row)):
+        raise HTTPException(403, detail="Only supplier delivery managers can assign courier or edit delivery")
 
     courier_id = payload.courier
     if courier_id is not None:
@@ -207,6 +232,8 @@ def upsert_for_order(payload: DeliveryUpsertPayload, user: dict = Depends(get_cu
             raise HTTPException(404, detail="courier not found")
         if "is_courier_enabled" in users.c and not courier.get("is_courier_enabled", False):
             raise HTTPException(400, detail="user is not courier-enabled")
+        if not _can_be_assigned_courier(db, courier_id, dict(order_row)):
+            raise HTTPException(400, detail="courier must belong to buyer or supplier company")
 
     existing = db.execute(select(deliveries).where(deliveries.c.order_id == payload.order)).mappings().first()
     now = datetime.now(timezone.utc)
@@ -260,9 +287,10 @@ def set_status(
 
     u_id = int(user["id"])
     participant = _is_order_participant(db, u_id, dict(order_row))
+    supplier_manager = _is_supplier_delivery_manager(db, u_id, dict(order_row))
     is_courier = delivery.get("courier_id") is not None and int(delivery["courier_id"]) == u_id
-    if not (participant or is_courier):
-        raise HTTPException(403, detail="Not allowed")
+    if not (supplier_manager or is_courier):
+        raise HTTPException(403, detail="Only assigned courier or supplier delivery manager can change delivery status")
 
     current_delivery_status = str(delivery.get("status") or "")
     target_delivery_status = (payload.status or "").upper()

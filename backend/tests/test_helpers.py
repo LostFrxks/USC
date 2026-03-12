@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import insert
+from sqlalchemy import insert, select
 from sqlalchemy.orm import Session
 
 from app.db.schema import (
     accounts_user,
+    catalog_category,
     catalog_product,
     companies_company,
     companies_companymember,
@@ -103,6 +104,12 @@ def seed_product(
     name: str = "Product",
     price: Decimal = Decimal("100"),
 ) -> None:
+    category_exists = db.execute(
+        select(catalog_category.c.id).where(catalog_category.c.id == category_id)
+    ).first()
+    if not category_exists:
+        db.execute(insert(catalog_category).values({"id": category_id, "name": f"Category {category_id}"}))
+
     db.execute(
         insert(catalog_product).values(
             {
@@ -131,6 +138,7 @@ def seed_order(
     supplier_company_id: int,
     status: str,
     delivery_mode: str = "YANDEX",
+    delivery_address: str | None = None,
     comment: str = "",
 ) -> None:
     db.execute(
@@ -139,6 +147,7 @@ def seed_order(
                 "id": order_id,
                 "status": status,
                 "delivery_mode": delivery_mode,
+                "delivery_address": delivery_address,
                 "comment": comment,
                 "created_at": now_utc(),
                 "buyer_company_id": buyer_company_id,

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import insert
 
 from app.db.schema import catalog_category, catalog_product
-from backend.tests.test_helpers import auth_headers, seed_company, seed_membership, seed_user
+from tests.test_helpers import auth_headers, seed_company, seed_membership, seed_user
 
 
 def test_products_update_and_list_extra_fields(client, db_session):

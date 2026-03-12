@@ -36,6 +36,30 @@ def _ensure_member(db: Session, user_id: int, company_id: int) -> None:
     if not exists:
         raise HTTPException(403, detail="Not allowed")
 
+
+def _membership_role(db: Session, user_id: int, company_id: int) -> str | None:
+    row = db.execute(
+        select(company_members.c.role).where(
+            company_members.c.user_id == user_id,
+            company_members.c.company_id == company_id,
+        )
+    ).first()
+    if not row or row[0] is None:
+        return None
+    return str(row[0]).upper()
+
+
+def _ensure_company_admin(db: Session, user_id: int, company_id: int) -> None:
+    role = _membership_role(db, user_id, company_id)
+    if role not in {"OWNER", "ADMIN"}:
+        raise HTTPException(403, detail="Only company admins can update company settings")
+
+
+def _ensure_company_owner(db: Session, user_id: int, company_id: int) -> None:
+    role = _membership_role(db, user_id, company_id)
+    if role != "OWNER":
+        raise HTTPException(403, detail="Only company owners can delete company")
+
 def _serialize_company(row: dict) -> dict:
     return {
         "id": row.get("id"),
@@ -164,12 +188,12 @@ def update_company(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_member(db, int(user["id"]), company_id)
+    _ensure_company_admin(db, int(user["id"]), company_id)
+    if payload.company_type is not None:
+        raise HTTPException(409, detail="company_type is immutable and cannot be changed via this endpoint")
     values: dict = {}
     if payload.name is not None and "name" in companies.c:
         values["name"] = payload.name.strip()
-    if payload.company_type is not None and "company_type" in companies.c:
-        values["company_type"] = payload.company_type
     if payload.phone is not None and "phone" in companies.c:
         values["phone"] = payload.phone
     if payload.address is not None and "address" in companies.c:
@@ -191,7 +215,7 @@ def delete_company(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ensure_member(db, int(user["id"]), company_id)
+    _ensure_company_owner(db, int(user["id"]), company_id)
     try:
         db.execute(delete(companies).where(companies.c.id == company_id))
         db.commit()
@@ -301,5 +325,3 @@ def list_suppliers(
     response = drf_page(items=items, total=total, limit=limit, offset=offset, path=str(request.url.path))
     set_json(cache_key, response, settings.CACHE_TTL_SUPPLIERS)
     return response
-
-

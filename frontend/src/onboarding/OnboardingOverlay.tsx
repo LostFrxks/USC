@@ -68,20 +68,17 @@ export default function OnboardingOverlay({
     };
   }, [onTargetFoundChange, step?.targetSelector, visible]);
 
-  useEffect(() => {
-    if (!visible) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onSkip();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onSkip, visible]);
-
   const isLast = stepIndex >= totalSteps - 1;
   const showBack = stepIndex > 0;
+  const progressPct = useMemo(() => {
+    if (!totalSteps) return 0;
+    return ((stepIndex + 1) / totalSteps) * 100;
+  }, [stepIndex, totalSteps]);
+  const progressSegments = useMemo(
+    () => Array.from({ length: totalSteps }, (_, index) => index <= stepIndex),
+    [stepIndex, totalSteps]
+  );
+
   const nextLabel = useMemo(() => {
     if (isLast) return "Завершить";
     if (step?.id === "welcome") return "Начать";
@@ -89,21 +86,22 @@ export default function OnboardingOverlay({
   }, [isLast, step?.id]);
 
   const actionLocked = step?.mode === "interaction_required" && !canGoNext && targetFound;
+  const accentClass = step?.accent ? `is-${step.accent}` : "is-brand";
   const cardStyle = useMemo(() => {
     if (!targetRect) return undefined;
     const viewportW = window.innerWidth;
     const viewportH = window.innerHeight;
-    const cardW = Math.min(360, viewportW - 24);
-    const belowTop = targetRect.bottom + 12;
-    const aboveTop = targetRect.top - 12;
-    const placeBelow = belowTop + 240 < viewportH;
+    const cardW = Math.min(372, viewportW - 24);
+    const belowTop = targetRect.bottom + 14;
+    const aboveTop = targetRect.top - 14;
+    const placeBelow = belowTop + 260 < viewportH;
     const baseLeft = targetRect.left + targetRect.width / 2 - cardW / 2;
     const left = clamp(baseLeft, 12, viewportW - cardW - 12);
 
     if (placeBelow) {
       return { top: belowTop, bottom: "auto", left, width: cardW } as CSSProperties;
     }
-    return { top: Math.max(12, aboveTop - 220), bottom: "auto", left, width: cardW } as CSSProperties;
+    return { top: Math.max(12, aboveTop - 240), bottom: "auto", left, width: cardW } as CSSProperties;
   }, [targetRect]);
 
   if (!visible || !step) return null;
@@ -136,18 +134,43 @@ export default function OnboardingOverlay({
         <div className="onboarding-scrim onboarding-scrim-full" />
       )}
 
-      <aside className="onboarding-card" style={cardStyle}>
-        <div className="onboarding-progress">{`${stepIndex + 1}/${totalSteps}`}</div>
-        <h3>{step.title}</h3>
-        <p>{step.description}</p>
+      <aside
+        className={`onboarding-card ${accentClass}`}
+        style={{ ...cardStyle, ["--onboarding-total" as string]: String(Math.max(1, totalSteps)) }}
+      >
+        <div className="onboarding-card-glow" aria-hidden="true" />
+
+        <div className="onboarding-progress-row">
+          <div className="onboarding-progress-copy">
+            <div className="onboarding-progress">{`${stepIndex + 1}/${totalSteps}`}</div>
+            {step.eyebrow ? <div className="onboarding-eyebrow">{step.eyebrow}</div> : null}
+          </div>
+          <div className="onboarding-progress-meter" aria-hidden="true">
+            <span style={{ width: `${progressPct}%` }} />
+          </div>
+        </div>
+
+        <div className="onboarding-progress-segments" aria-hidden="true">
+          {progressSegments.map((isDone, index) => (
+            <span key={index} className={isDone ? "done" : ""} />
+          ))}
+        </div>
+
+        <div className="onboarding-copy">
+          <h3>{step.title}</h3>
+          <p>{step.description}</p>
+        </div>
+
         {step.mode === "interaction_required" ? (
           <div className={`onboarding-action-hint ${actionLocked ? "pending" : "done"}`}>
             {actionLocked ? step.actionHint || "Выполните действие, чтобы продолжить." : "Отлично, можно переходить дальше."}
           </div>
         ) : null}
+
         {!targetFound && step.targetSelector ? (
           <div className="onboarding-action-hint fallback">Целевой элемент не найден, можно продолжить.</div>
         ) : null}
+
         <div className="onboarding-actions">
           {showBack ? (
             <button type="button" className="onboarding-btn ghost" onClick={onBack}>
