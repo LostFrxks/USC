@@ -107,7 +107,7 @@ export function Drawer({
           </button>
 
           <button className="drawer-link" onClick={() => (onGo("deliveries"), onClose())}>
-            <img src="/media/apple_car.svg" alt="" />
+            <img src="/media/delivery_truck.svg" alt="" />
             <span>Доставки</span>
           </button>
 

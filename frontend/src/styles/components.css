@@ -52,7 +52,7 @@
   z-index: 1;
   height: 2px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #183563, #2f66d8);
+  background: linear-gradient(90deg, var(--brand-blue-strong), var(--brand-blue));
 }
 
 .burger .burger-line:nth-child(1) {
@@ -81,11 +81,11 @@
 }
 
 .drawer-open .burger {
-  border-color: rgba(53, 92, 255, 0.5);
+  border-color: rgba(47, 102, 216, 0.42);
   background: radial-gradient(circle at 30% 20%, #f8fbff, #dfeaff 68%);
   box-shadow:
-    0 12px 24px rgba(53, 92, 255, 0.25),
-    0 0 0 4px rgba(53, 92, 255, 0.14);
+    0 12px 24px rgba(47, 102, 216, 0.2),
+    0 0 0 4px rgba(47, 102, 216, 0.12);
 }
 
 .burger-badge {
@@ -198,13 +198,12 @@
   max-width: 402px;
   height: 62px;
   padding: 5px;
-  background:
-    linear-gradient(150deg, rgba(25, 56, 112, 0.92) 0%, rgba(19, 47, 104, 0.9) 100%);
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(238, 244, 255, 0.96) 100%);
   border-radius: 999px;
   box-shadow:
-    0 10px 24px rgba(9, 22, 49, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  border: none;
+    0 10px 24px rgba(15, 23, 42, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(47, 102, 216, 0.14);
   backdrop-filter: blur(10px) saturate(120%);
   display: flex;
   align-items: stretch;
@@ -219,7 +218,7 @@
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 42%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.52), transparent 50%);
   pointer-events: none;
   z-index: 1;
 }
@@ -231,10 +230,10 @@
   left: 5px;
   width: calc((100% - 10px) / var(--tab-count, 4));
   border-radius: 999px;
-  background: linear-gradient(155deg, #82b4ff 0%, #5f90ff 58%, #4f79ef 100%);
+  background: linear-gradient(155deg, #7ea8ff 0%, var(--brand-blue) 56%, #4f79ef 100%);
   box-shadow:
-    inset 0 0 0 1px rgba(239, 247, 255, 0),
-    0 7px 16px rgba(24, 67, 159, 0.44);
+    inset 0 0 0 1px rgba(239, 247, 255, 0.14),
+    0 7px 16px rgba(47, 102, 216, 0.22);
   transition: transform 0.34s cubic-bezier(0.22, 0.8, 0.22, 1);
   z-index: 2;
 }
@@ -243,7 +242,7 @@
   flex: 1;
   border: none;
   background: transparent;
-  color: #dbeafe;
+  color: #64748b;
   font-size: 11px;
   display: flex;
   align-items: center;
@@ -272,8 +271,8 @@
 .tab-icon {
   width: 21px;
   height: 21px;
-  filter: brightness(0) invert(1) drop-shadow(0 0 4px rgba(255, 255, 255, 0.28));
-  opacity: 0.98;
+  filter: brightness(0) saturate(100%) invert(20%) sepia(20%) saturate(938%) hue-rotate(185deg) brightness(94%) contrast(89%);
+  opacity: 0.76;
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
@@ -284,6 +283,7 @@
 .tab.active .tab-icon {
   opacity: 1;
   transform: scale(1.14);
+  filter: brightness(0) invert(1);
 }
 
 .tab-badge {

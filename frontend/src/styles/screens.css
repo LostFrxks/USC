@@ -349,8 +349,8 @@
 .product-brand-line {
   font-size: 10px;
   font-weight: 700;
-  color: #1e3a8a;
-  background: rgba(53, 92, 255, 0.08);
+  color: var(--brand-blue-strong);
+  background: rgba(47, 102, 216, 0.08);
   border-radius: 999px;
   padding: 4px 8px;
   overflow: hidden;
@@ -367,9 +367,8 @@
 .product-fact-chip {
   font-size: 10px;
   font-weight: 600;
-  color: #12336e;
-  background: linear-gradient(180deg, #edf3ff 0%, #e3edff 100%);
-  border: 1px solid rgba(53, 92, 255, 0.24);
+  color: var(--brand-blue-strong);
+  background: linear-gradient(180deg, #f4f7ff 0%, #ecf2ff 100%);
   border-radius: 999px;
   padding: 3px 8px;
   max-width: 100%;
@@ -379,7 +378,7 @@
 }
 
 .product-fact-chip strong {
-  color: #0f2d68;
+  color: var(--brand-blue-strong);
 }
 
 .product-quality-note {
@@ -408,7 +407,7 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(53, 92, 255, 0.25);
+  box-shadow: 0 8px 18px rgba(47, 102, 216, 0.22);
 }
 
 /* Image-only cards like old MVP */
@@ -2747,17 +2746,19 @@
 }
 
 .drawer-rating-text {
-  margin-top: 7px;
+  margin-top: 10px;
   font-size: 13px;
   color: #475569;
   font-weight: 600;
+  line-height: 1.45;
 }
 
 .drawer-score-row {
-  margin-top: 8px;
+  margin-top: 10px;
   display: flex;
   gap: 8px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .drawer-score-pill {
@@ -2772,27 +2773,29 @@
 
 .drawer-score-pill-accent {
   border-color: rgba(47, 102, 216, 0.34);
-  color: #1e3a8a;
+  color: var(--brand-blue-strong);
   background: rgba(47, 102, 216, 0.1);
 }
 
 .drawer-company {
-  margin-top: 10px;
+  margin-top: 14px;
   font-size: 14px;
   font-weight: 800;
   color: #0f172a;
+  line-height: 1.35;
 }
 
 .drawer-role {
-  margin-top: 5px;
+  margin-top: 7px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #64748b;
+  line-height: 1.5;
 }
 
 .drawer-role-switch {
-  margin-top: 8px;
+  margin-top: 12px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
@@ -2810,9 +2813,9 @@
 }
 
 .drawer-role-btn.active {
-  border-color: rgba(47, 102, 216, 0.35);
-  background: rgba(47, 102, 216, 0.12);
-  color: #1e3a8a;
+  border-color: rgba(47, 102, 216, 0.32);
+  background: rgba(47, 102, 216, 0.1);
+  color: var(--brand-blue-strong);
 }
 
 .drawer-menu {
@@ -4428,21 +4431,18 @@
 
 .profilev2-role-chip {
   margin-top: 8px;
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  background: rgba(47, 102, 216, 0.12);
-  color: #1e3a8a;
-  border: 1px solid rgba(47, 102, 216, 0.24);
+  display: inline-block;
+  color: #94a3b8;
   font-size: 11px;
   font-weight: 700;
-  padding: 5px 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .profilev2-rating-row {
   margin-top: 8px;
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .profilev2-stars {
@@ -4477,6 +4477,7 @@
   font-size: 12px;
   color: #475569;
   font-weight: 600;
+  line-height: 1.45;
 }
 
 .profilev2-actions {
@@ -4497,7 +4498,7 @@
 }
 
 .profilev2-action-primary {
-  background: linear-gradient(135deg, #2f66d8, #1f3c88);
+  background: linear-gradient(135deg, var(--brand-blue), var(--brand-blue-strong));
   color: #ffffff;
 }
 
@@ -4532,8 +4533,8 @@
 }
 
 .profilev2-company-strip {
-  border: 1px solid rgba(47, 102, 216, 0.2);
-  background: linear-gradient(135deg, #f8fbff, #eef4ff);
+  border: 1px solid rgba(47, 102, 216, 0.18);
+  background: linear-gradient(135deg, #f8fbff, var(--brand-blue-soft));
   border-radius: 14px;
   padding: 10px 12px;
   display: grid;
@@ -4557,6 +4558,7 @@
 .profilev2-company-meta {
   font-size: 11px;
   color: #475569;
+  line-height: 1.45;
 }
 
 .profilev2-stat-label {
@@ -4608,19 +4610,17 @@
 }
 
 .profilev2-row-sub {
-  margin-top: 2px;
+  margin-top: 4px;
   font-size: 11px;
   color: #64748b;
+  line-height: 1.45;
 }
 
 .profilev2-row-side {
   font-size: 11px;
   font-weight: 700;
   color: #334155;
-  background: #f1f5f9;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 999px;
-  padding: 4px 8px;
+  line-height: 1.35;
   max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;

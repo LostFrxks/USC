@@ -401,6 +401,11 @@ export default function App() {
     }
   }, [activeTab, closeDrawer, drawerOpen, goTab, onboarding.isRunning, onboardingStep]);
 
+  const handleAuthSuccess = useCallback(() => {
+    setSplashAnimationDone(false);
+    setAuthed(true);
+  }, []);
+
   const openFilters = () => {
     // Filters panel is not implemented yet.
   };
@@ -455,7 +460,7 @@ export default function App() {
   if (!authed) {
     return (
       <div className="app">
-        <AuthScreen onSuccess={() => setAuthed(true)} />
+        <AuthScreen onSuccess={handleAuthSuccess} />
       </div>
     );
   }

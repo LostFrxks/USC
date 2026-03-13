@@ -10,8 +10,12 @@
   --card: #ffffff;
   --text: #0f172a;
   --muted: #64748b;
-  --primary: #355cff;
-  --primary-strong: #2646e8;
+  --brand-blue: #2f66d8;
+  --brand-blue-strong: #1f3c88;
+  --brand-blue-soft: #eef4ff;
+  --brand-blue-soft-strong: #dbe7ff;
+  --primary: var(--brand-blue);
+  --primary-strong: var(--brand-blue-strong);
   --accent: #00c2ff;
   --success: #22c55e;
   --warning: #f59e0b;
