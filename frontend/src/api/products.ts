@@ -15,6 +15,7 @@ type ProductApi = {
   category?: number | string | null;
   category_id?: number | string | null;
   name: string;
+  image_url?: string | null;
   description?: string;
   shelf_life_days?: number | null;
   storage_condition?: string | null;
@@ -189,7 +190,7 @@ function normalize(p: ProductApi): Product {
     lead_time_days: p.lead_time_days == null ? null : Number.isFinite(Number(p.lead_time_days)) ? Number(p.lead_time_days) : null,
     seller: p.supplier_name ?? `Supplier #${rawSupplierCompany ?? "?"}`,
     price: Number(p.price ?? 0),
-    image: pickImage(p, categoryId),
+    image: String(p.image_url || "").trim() || pickImage(p, categoryId),
     category: categoryKey,
     supplier_company_id: Number.isFinite(supplierCompanyId) ? supplierCompanyId : undefined,
     category_id: categoryId != null && Number.isFinite(categoryId) ? categoryId : null,

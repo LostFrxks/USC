@@ -71,4 +71,26 @@ describe("products api normalization", () => {
     expect(products[0]).not.toHaveProperty("reviews");
     expect(products[0].category).toBe("bread");
   });
+
+  it("prefers image_url from backend over frontend category fallback", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        productListResponse([
+          {
+            id: 31,
+            name: "Turkey Breast",
+            price: "610",
+            category_id: 1,
+            supplier_company_id: 6,
+            image_url: "/media/card_meat6.jpg",
+          },
+        ])
+      )
+    );
+
+    const products = await fetchProducts({ q: "image-url-check" });
+
+    expect(products[0].image).toBe("/media/card_meat6.jpg");
+  });
 });

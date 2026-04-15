@@ -65,6 +65,7 @@ class ProductCreatePayload(BaseModel):
     supplier_company_id: int = Field(..., ge=1)
     category_id: int | None = None
     name: str = Field(min_length=1)
+    image_url: str | None = None
     description: str | None = None
     shelf_life_days: int | None = Field(default=None, ge=0)
     storage_condition: str | None = None
@@ -86,6 +87,7 @@ class ProductCreatePayload(BaseModel):
 class ProductUpdatePayload(BaseModel):
     category_id: int | None = None
     name: str | None = None
+    image_url: str | None = None
     description: str | None = None
     shelf_life_days: int | None = Field(default=None, ge=0)
     storage_condition: str | None = None
@@ -219,6 +221,8 @@ def create_product(
     }
     if payload.category_id is not None and "category_id" in products.c:
         values["category_id"] = payload.category_id
+    if "image_url" in products.c and payload.image_url is not None:
+        values["image_url"] = payload.image_url.strip()
     # Provide safe defaults for NOT NULL columns even if DB defaults are absent.
     if "description" in products.c:
         values["description"] = payload.description if payload.description is not None else ""
@@ -288,6 +292,8 @@ def update_product(
         values["category_id"] = payload.category_id
     if payload.name is not None and "name" in products.c:
         values["name"] = payload.name.strip()
+    if "image_url" in provided_fields and "image_url" in products.c:
+        values["image_url"] = (payload.image_url or "").strip() or None
     if "description" in provided_fields and "description" in products.c:
         values["description"] = payload.description or ""
     if "shelf_life_days" in provided_fields and "shelf_life_days" in products.c:

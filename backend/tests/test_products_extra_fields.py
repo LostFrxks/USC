@@ -20,6 +20,7 @@ def test_products_update_and_list_extra_fields(client, db_session):
                 "supplier_company_id": 20,
                 "category_id": 10,
                 "name": "Chicken Fillet",
+                "image_url": "/media/card_meat2.jpg",
                 "description": "Fresh chilled fillet",
                 "shelf_life_days": 7,
                 "storage_condition": "+2...+6C",
@@ -47,6 +48,7 @@ def test_products_update_and_list_extra_fields(client, db_session):
         headers=auth_headers(1, "supplier@test.local"),
         json={
             "description": "Updated description",
+            "image_url": "/media/card_meat6.jpg",
             "shelf_life_days": 10,
             "storage_condition": "Dry store",
             "origin_country": "Kazakhstan",
@@ -62,6 +64,7 @@ def test_products_update_and_list_extra_fields(client, db_session):
     assert update_response.status_code == 200
     updated = update_response.json()
     assert updated["description"] == "Updated description"
+    assert updated["image_url"] == "/media/card_meat6.jpg"
     assert updated["shelf_life_days"] == 10
     assert updated["storage_condition"] == "Dry store"
     assert updated["origin_country"] == "Kazakhstan"
@@ -77,6 +80,7 @@ def test_products_update_and_list_extra_fields(client, db_session):
     assert list_response.status_code == 200
     page = list_response.json()
     assert page["results"][0]["shelf_life_days"] == 10
+    assert page["results"][0]["image_url"] == "/media/card_meat6.jpg"
     assert page["results"][0]["storage_condition"] == "Dry store"
     assert page["results"][0]["origin_country"] == "Kazakhstan"
     assert page["results"][0]["brand"] == "Prime Select"

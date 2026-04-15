@@ -5,7 +5,7 @@ from decimal import Decimal
 from pathlib import Path
 import sys
 
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, update
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -96,6 +96,7 @@ def ensure_product(
     category_id: int,
     name: str,
     price: Decimal,
+    image_url: str | None = None,
     unit: str = "kg",
     min_qty: Decimal = Decimal("1"),
     in_stock: bool = True,
@@ -118,11 +119,17 @@ def ensure_product(
         )
     ).mappings().first()
     if row:
+        updates = {}
+        if "image_url" in products.c and image_url and row.get("image_url") != image_url:
+            updates["image_url"] = image_url
+        if updates:
+            db.execute(update(products).where(products.c.id == int(row["id"])).values(updates))
         return int(row["id"])
     values = {
         "supplier_company_id": supplier_company_id,
         "category_id": category_id,
         "name": name,
+        "image_url": image_url,
         "description": f"{name} wholesale",
         "shelf_life_days": shelf_life_days,
         "storage_condition": storage_condition,
@@ -325,22 +332,25 @@ def main() -> None:
         cat_grain = ensure_category(db, "Grain")
 
         # Products
-        p1 = ensure_product(db, supplier_company_id=supplier_co_1, category_id=cat_meat, name="Beef Premium", price=Decimal("780"))
-        p2 = ensure_product(db, supplier_company_id=supplier_co_1, category_id=cat_milk, name="Milk 3.2%", price=Decimal("68"), unit="l")
-        p3 = ensure_product(db, supplier_company_id=supplier_co_1, category_id=cat_bread, name="Wheat Bread", price=Decimal("30"), unit="pcs")
-        p4 = ensure_product(db, supplier_company_id=supplier_co_1, category_id=cat_fruit, name="Tomatoes", price=Decimal("95"))
-        p5 = ensure_product(db, supplier_company_id=supplier_co_2, category_id=cat_fish, name="Salmon Fillet", price=Decimal("1200"))
-        p6 = ensure_product(db, supplier_company_id=supplier_co_2, category_id=cat_fish, name="Trout Fresh", price=Decimal("920"))
-        p7 = ensure_product(db, supplier_company_id=supplier_co_2, category_id=cat_grain, name="Rice Long Grain", price=Decimal("75"))
-        p8 = ensure_product(db, supplier_company_id=supplier_co_2, category_id=cat_grain, name="Buckwheat", price=Decimal("88"))
-        p9 = ensure_product(db, supplier_company_id=supplier_co_3, category_id=cat_fruit, name="Apples Gala", price=Decimal("92"))
-        p10 = ensure_product(db, supplier_company_id=supplier_co_3, category_id=cat_fruit, name="Bananas Premium", price=Decimal("118"))
-        p11 = ensure_product(db, supplier_company_id=supplier_co_3, category_id=cat_milk, name="Yogurt Natural", price=Decimal("84"), unit="pcs")
-        p12 = ensure_product(db, supplier_company_id=supplier_co_3, category_id=cat_bread, name="Corn Bread", price=Decimal("42"), unit="pcs")
-        p13 = ensure_product(db, supplier_company_id=supplier_co_4, category_id=cat_meat, name="Chicken Fillet", price=Decimal("420"))
-        p14 = ensure_product(db, supplier_company_id=supplier_co_4, category_id=cat_meat, name="Turkey Breast", price=Decimal("610"))
-        p15 = ensure_product(db, supplier_company_id=supplier_co_4, category_id=cat_grain, name="Oat Flakes", price=Decimal("96"))
-        p16 = ensure_product(db, supplier_company_id=supplier_co_4, category_id=cat_fish, name="Mackerel", price=Decimal("540"))
+        p1 = ensure_product(db, supplier_company_id=supplier_co_1, category_id=cat_meat, name="Beef Premium", price=Decimal("780"), image_url="/media/card_meat1.jpg")
+        p2 = ensure_product(db, supplier_company_id=supplier_co_1, category_id=cat_milk, name="Milk 3.2%", price=Decimal("68"), image_url="/media/card_milk1.jpg", unit="l")
+        p3 = ensure_product(db, supplier_company_id=supplier_co_1, category_id=cat_bread, name="Wheat Bread", price=Decimal("30"), image_url="/media/card_bread1.jpg", unit="pcs")
+        p4 = ensure_product(db, supplier_company_id=supplier_co_1, category_id=cat_fruit, name="Tomatoes", price=Decimal("95"), image_url="/media/card_fruit1.jpg")
+        p5 = ensure_product(db, supplier_company_id=supplier_co_2, category_id=cat_fish, name="Salmon Fillet", price=Decimal("1200"), image_url="/media/card_fish1.jpg")
+        p6 = ensure_product(db, supplier_company_id=supplier_co_2, category_id=cat_fish, name="Trout Fresh", price=Decimal("920"), image_url="/media/card_fish2.jpg")
+        p7 = ensure_product(db, supplier_company_id=supplier_co_2, category_id=cat_grain, name="Rice Long Grain", price=Decimal("75"), image_url="/media/card_grain1.jpg")
+        p8 = ensure_product(db, supplier_company_id=supplier_co_2, category_id=cat_grain, name="Buckwheat", price=Decimal("88"), image_url="/media/card_grain2.jpg")
+        p9 = ensure_product(db, supplier_company_id=supplier_co_3, category_id=cat_fruit, name="Apples Gala", price=Decimal("92"), image_url="/media/card_fruit2.jpg")
+        p10 = ensure_product(db, supplier_company_id=supplier_co_3, category_id=cat_fruit, name="Bananas Premium", price=Decimal("118"), image_url="/media/card_fruit3.jpg")
+        p11 = ensure_product(db, supplier_company_id=supplier_co_3, category_id=cat_milk, name="Yogurt Natural", price=Decimal("84"), image_url="/media/card_milk2.jpg", unit="pcs")
+        p12 = ensure_product(db, supplier_company_id=supplier_co_3, category_id=cat_bread, name="Corn Bread", price=Decimal("42"), image_url="/media/card_bread2.jpg", unit="pcs")
+        p13 = ensure_product(db, supplier_company_id=supplier_co_4, category_id=cat_meat, name="Chicken Fillet", price=Decimal("420"), image_url="/media/card_meat2.jpg")
+        p14 = ensure_product(db, supplier_company_id=supplier_co_4, category_id=cat_meat, name="Turkey Breast", price=Decimal("610"), image_url="/media/card_meat3.jpg")
+        p15 = ensure_product(db, supplier_company_id=supplier_co_4, category_id=cat_grain, name="Oat Flakes", price=Decimal("96"), image_url="/media/card_grain3.jpg")
+        p16 = ensure_product(db, supplier_company_id=supplier_co_4, category_id=cat_fish, name="Mackerel", price=Decimal("540"), image_url="/media/card_fish3.jpg")
+        p17 = ensure_product(db, supplier_company_id=supplier_co_1, category_id=cat_meat, name="Beef Mince", price=Decimal("650"), image_url="/media/card_meat4.jpg")
+        p18 = ensure_product(db, supplier_company_id=supplier_co_4, category_id=cat_meat, name="Lamb Rack", price=Decimal("890"), image_url="/media/card_meat5.jpg")
+        p19 = ensure_product(db, supplier_company_id=supplier_co_1, category_id=cat_meat, name="Duck Fillet", price=Decimal("740"), image_url="/media/card_meat6.jpg")
         # Buyer companies also publish products, so they can sell in cross-role flow.
         b1p1 = ensure_product(
             db,
@@ -348,6 +358,7 @@ def main() -> None:
             category_id=cat_bread,
             name="Cafe Bakery Set",
             price=Decimal("58"),
+            image_url="/media/card_bread3.jpg",
             unit="pcs",
             stock_qty=Decimal("240"),
         )
@@ -357,6 +368,7 @@ def main() -> None:
             category_id=cat_milk,
             name="House Yogurt Drink",
             price=Decimal("72"),
+            image_url="/media/card_milk3.jpg",
             unit="l",
             stock_qty=Decimal("180"),
         )
@@ -366,6 +378,7 @@ def main() -> None:
             category_id=cat_grain,
             name="Nomad Granola Mix",
             price=Decimal("115"),
+            image_url="/media/card_grain1.jpg",
             unit="pcs",
             stock_qty=Decimal("220"),
         )
@@ -375,6 +388,7 @@ def main() -> None:
             category_id=cat_fruit,
             name="Fruit Snack Pack",
             price=Decimal("106"),
+            image_url="/media/card_fruit1.jpg",
             unit="pcs",
             stock_qty=Decimal("210"),
         )

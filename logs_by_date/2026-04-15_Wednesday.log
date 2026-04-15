@@ -9,3 +9,9 @@
 2026-04-15 14:21:45
 - Expanded .gitignore for frontend/frontend_mobile local cache and generated TypeScript/Expo artifacts.
 - Fixed the mojibake regression in frontend geo tests and cleaned related encoding-garbled comments in screens.css to satisfy encoding checks.
+2026-04-15 15:59:05
+- Added backend product image_url support with Alembic migration, product API wiring, and seed-backed image paths so web product cards load images from API/DB.
+- Expanded demo catalog seeding with additional meat SKUs and reseeded local data so the meat category shows a fuller product grid.
+2026-04-15 16:03:51
+- Added the catalog product image_url migration and backend/frontend wiring so product cards read images from API data with updated tests and seed data.
+- Center-aligned the cart empty-state helper text in the web styles.
