@@ -1,0 +1,4 @@
+2026-04-07 11:49:17
+- Activated Serena for the USC project.
+- Started the development site with Docker Compose; frontend is available at http://localhost:5173 and backend health at http://localhost:8001/api/health.
+- Expanded .gitignore for frontend local env/build/test artifacts.

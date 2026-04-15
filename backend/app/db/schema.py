@@ -120,6 +120,8 @@ orders_order = Table(
     Column("status", String(20), nullable=False),
     Column("delivery_mode", String(30), nullable=False),
     Column("delivery_address", Text, nullable=True),
+    Column("delivery_lat", Numeric(9, 6), nullable=True),
+    Column("delivery_lng", Numeric(9, 6), nullable=True),
     Column("comment", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("buyer_company_id", BigInteger, ForeignKey("companies_company.id", ondelete="RESTRICT"), nullable=False),

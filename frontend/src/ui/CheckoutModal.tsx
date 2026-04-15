@@ -1,5 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from "react";
-import { appendGeoTag, validateLatLngInputs, type LatLng } from "../utils/geo";
+import { validateLatLngInputs, type LatLng } from "../utils/geo";
 
 const MapPicker = lazy(() => import("./MapPicker"));
 
@@ -17,6 +17,8 @@ export default function CheckoutModal({
   onSubmit: (data: {
     address: string;
     comment: string;
+    delivery_lat: number | null;
+    delivery_lng: number | null;
     delivery_mode: "YANDEX" | "SUPPLIER_COURIER" | "BUYER_COURIER";
   }) => void | Promise<void>;
 }) {
@@ -52,8 +54,13 @@ export default function CheckoutModal({
 
   const submit = async () => {
     if (busy) return;
-    const finalComment = appendGeoTag(comment, coords);
-    await onSubmit({ address: address.trim(), comment: finalComment, delivery_mode: deliveryMode });
+    await onSubmit({
+      address: address.trim(),
+      comment: comment.trim(),
+      delivery_lat: coords?.lat ?? null,
+      delivery_lng: coords?.lng ?? null,
+      delivery_mode: deliveryMode,
+    });
   };
 
   return (

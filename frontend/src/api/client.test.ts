@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { api, ApiError, SESSION_EXPIRED_EVENT } from "./client";
+import { api, ApiError, bootstrapSession, hasAccessToken, SESSION_EXPIRED_EVENT, setAccessToken } from "./client";
 
 describe("api client", () => {
   beforeEach(() => {
@@ -13,14 +13,13 @@ describe("api client", () => {
   });
 
   it("refreshes token on first 401 and retries request", async () => {
-    localStorage.setItem("usc_access_token", "old-access");
-    localStorage.setItem("usc_refresh_token", "old-refresh");
+    setAccessToken("old-access");
 
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response("unauthorized", { status: 401 }))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ access: "new-access", refresh: "new-refresh" }), {
+        new Response(JSON.stringify({ access: "new-access" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
@@ -37,14 +36,13 @@ describe("api client", () => {
     const result = await api<{ ok: boolean }>("/orders/", { auth: true });
 
     expect(result.ok).toBe(true);
-    expect(localStorage.getItem("usc_access_token")).toBe("new-access");
-    expect(localStorage.getItem("usc_refresh_token")).toBe("new-refresh");
+    expect(hasAccessToken()).toBe(true);
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ credentials: "include" });
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("throws ApiError and emits session-expired after failed refresh", async () => {
-    localStorage.setItem("usc_access_token", "old-access");
-    localStorage.setItem("usc_refresh_token", "old-refresh");
+    setAccessToken("old-access");
 
     const events: Event[] = [];
     const handler = (ev: Event) => events.push(ev);
@@ -71,8 +69,7 @@ describe("api client", () => {
   });
 
   it("uses single refresh request for concurrent 401 responses", async () => {
-    localStorage.setItem("usc_access_token", "old-access");
-    localStorage.setItem("usc_refresh_token", "old-refresh");
+    setAccessToken("old-access");
 
     let protectedCalls = 0;
     const fetchMock = vi.fn((url: string) => {
@@ -90,7 +87,7 @@ describe("api client", () => {
       }
       if (url.endsWith("/auth/token/refresh/")) {
         return Promise.resolve(
-          new Response(JSON.stringify({ access: "new-access", refresh: "new-refresh" }), {
+          new Response(JSON.stringify({ access: "new-access" }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           })
@@ -112,5 +109,24 @@ describe("api client", () => {
       String(url).endsWith("/auth/token/refresh/")
     );
     expect(refreshCalls).toHaveLength(1);
+    expect(refreshCalls[0]?.[1]).toMatchObject({ credentials: "include" });
+  });
+
+  it("bootstraps session from refresh cookie when access token is missing", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ access: "bootstrapped-access" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(bootstrapSession()).resolves.toBe(true);
+    expect(hasAccessToken()).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/auth\/token\/refresh\/$/),
+      expect.objectContaining({ credentials: "include" })
+    );
   });
 });

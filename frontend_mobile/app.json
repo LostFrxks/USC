@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "USC Mobile",
+    "slug": "usc-mobile",
+    "scheme": "usc-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/catalog/meat.jpg",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#F5EFE4"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-location"
+    ],
+    "android": {
+      "package": "kg.auca.uscmobile",
+      "versionCode": 1
+    },
+    "ios": {
+      "bundleIdentifier": "kg.auca.uscmobile"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

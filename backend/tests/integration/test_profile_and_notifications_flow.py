@@ -29,6 +29,22 @@ def test_profile_patch_returns_updated_profile(client, db_session):
     assert payload["companies"][0]["name"] == "New Name LLC"
 
 
+def test_profile_patch_returns_updated_courier_flag(client, db_session):
+    seed_user(db_session, user_id=1, email="owner@test.local", is_courier_enabled=False)
+    db_session.commit()
+
+    response = client.patch(
+        "/api/profile/me/",
+        json={
+            "is_courier_enabled": True,
+        },
+        headers=auth_headers(1, "owner@test.local"),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["is_courier_enabled"] is True
+
+
 def test_notifications_read_lifecycle(client, db_session):
     seed_user(db_session, user_id=1, email="user@test.local")
     db_session.commit()

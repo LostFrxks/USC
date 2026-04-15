@@ -31,7 +31,7 @@ describe("useOnboarding", () => {
     });
     await waitFor(() => expect(result.current.isRunning).toBe(false));
     const persisted = readOnboardingState(ctx);
-    expect(persisted?.status).toBe("in_progress");
+    expect(persisted?.status).toBe("completed");
     expect(persisted?.stepIndex).toBe(1);
   });
 
@@ -62,7 +62,7 @@ describe("useOnboarding", () => {
 
     rerender({ enabled: false });
     rerender({ enabled: true });
-    await waitFor(() => expect(result.current.isRunning).toBe(true));
+    await waitFor(() => expect(result.current.isRunning).toBe(false));
     expect(result.current.stepIndex).toBe(2);
   });
 
@@ -96,5 +96,31 @@ describe("useOnboarding", () => {
     await waitFor(() => expect(result.current.isRunning).toBe(true));
     expect(result.current.stepIndex).toBe(0);
     expect(localStorage.getItem(buildOnboardingStateKey(ctx))).toContain("\"status\":\"in_progress\"");
+  });
+
+  it("keeps an active guide running during transient disabled periods", async () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }) =>
+        useOnboarding({
+          enabled,
+          context: ctx,
+          stepsCount: 8,
+        }),
+      { initialProps: { enabled: true } }
+    );
+
+    await waitFor(() => expect(result.current.isRunning).toBe(true));
+    act(() => {
+      result.current.next();
+    });
+    await waitFor(() => expect(result.current.stepIndex).toBe(1));
+
+    rerender({ enabled: false });
+    expect(result.current.isRunning).toBe(true);
+    expect(result.current.stepIndex).toBe(1);
+
+    rerender({ enabled: true });
+    expect(result.current.isRunning).toBe(true);
+    expect(result.current.stepIndex).toBe(1);
   });
 });

@@ -39,6 +39,26 @@ def test_profile_patch_success_updates_user_and_company(client, db_session):
     assert company_row["name"] == "New Co"
 
 
+def test_profile_patch_updates_courier_flag(client, db_session):
+    seed_user(db_session, user_id=10, email="owner@test.local", phone="+996700111111", is_courier_enabled=False)
+    db_session.commit()
+
+    response = client.patch(
+        "/api/profile/me/",
+        json={
+            "is_courier_enabled": True,
+        },
+        headers=auth_headers(10, "owner@test.local"),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["is_courier_enabled"] is True
+
+    user_row = db_session.execute(select(accounts_user).where(accounts_user.c.id == 10)).mappings().one()
+    assert user_row["is_courier_enabled"] is True
+
+
 def test_profile_patch_email_conflict_returns_409(client, db_session):
     seed_user(db_session, user_id=10, email="owner@test.local")
     seed_user(db_session, user_id=11, email="taken@test.local")

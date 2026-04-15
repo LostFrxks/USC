@@ -4,6 +4,7 @@ import {
   formatGeoTag,
   isValidLatLng,
   parseGeoTag,
+  stripGeoTag,
   validateLatLngInputs,
 } from "./geo";
 
@@ -36,6 +37,11 @@ describe("geo utils", () => {
     expect(parseGeoTag("test [ geo : 42.874600 , 74.569800 ]")).toEqual({ lat: 42.8746, lng: 74.5698 });
     expect(parseGeoTag("test [geo:120,10]")).toBeNull();
     expect(parseGeoTag("test")).toBeNull();
+  });
+
+  it("strips geo tag from display text", () => {
+    expect(stripGeoTag("РџРѕР·РІРѕРЅРёС‚Рµ\n[geo:42.874600,74.569800]")).toBe("РџРѕР·РІРѕРЅРёС‚Рµ");
+    expect(stripGeoTag("[geo:42.874600,74.569800]")).toBe("");
   });
 
   it("returns explicit input validation states", () => {

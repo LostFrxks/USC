@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { isApiError } from "../api/client";
+import { hasAccessToken, isApiError } from "../api/client";
 import { supplierConfirmOrder } from "../api/orders";
 import {
   fetchNotifications,
@@ -58,7 +58,7 @@ export default function NotificationsScreen({
   const [unreadCount, setUnreadCount] = useState(0);
 
   const load = () => {
-    if (!localStorage.getItem("usc_access_token")) {
+    if (!hasAccessToken()) {
       onSessionExpired?.();
       return;
     }
@@ -204,4 +204,3 @@ export default function NotificationsScreen({
     </section>
   );
 }
-

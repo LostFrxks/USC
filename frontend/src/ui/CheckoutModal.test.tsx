@@ -30,7 +30,7 @@ describe("CheckoutModal", () => {
     expect(screen.getByText("Координаты не будут добавлены")).toBeInTheDocument();
   });
 
-  it("submits geo tag when coordinates are valid", async () => {
+  it("submits explicit delivery coordinates when coordinates are valid", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const { container } = render(<CheckoutModal open total={100} onClose={() => undefined} onSubmit={onSubmit} />);
 
@@ -43,7 +43,9 @@ describe("CheckoutModal", () => {
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(
         expect.objectContaining({
-          comment: "[geo:42.874600,74.569800]",
+          comment: "",
+          delivery_lat: 42.8746,
+          delivery_lng: 74.5698,
         })
       );
     });

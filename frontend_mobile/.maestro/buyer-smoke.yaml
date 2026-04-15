@@ -1,0 +1,64 @@
+appId: com.usc.mobile
+---
+- launchApp
+- assertVisible: "USC Mobile"
+- tapOn:
+    id: "demo-login-buyer1"
+- tapOn:
+    id: "company-option-10"
+    optional: true
+- tapOn:
+    id: "onboarding-skip"
+    optional: true
+- assertVisible:
+    id: "screen-home"
+- tapOn:
+    id: "tab-cart"
+- assertVisible:
+    id: "screen-cart"
+- tapOn:
+    id: "cart-clear"
+    optional: true
+- tapOn:
+    id: "tab-home"
+- tapOn:
+    id: "home-product-add-0"
+- tapOn:
+    id: "tab-cart"
+- assertVisible:
+    id: "cart-create-order"
+- tapOn:
+    id: "cart-open-map-picker"
+- assertVisible:
+    id: "map-picker-modal"
+- tapOn:
+    id: "map-picker-confirm"
+- tapOn:
+    id: "cart-create-order"
+- assertVisible:
+    id: "screen-order-detail"
+- back
+- tapOn:
+    id: "tab-orders"
+- assertVisible:
+    id: "screen-orders"
+- tapOn:
+    id: "tab-home"
+- tapOn:
+    id: "open-analytics"
+- assertVisible:
+    id: "screen-analytics"
+- tapOn:
+    id: "analytics-open-ai"
+- assertVisible:
+    id: "screen-ai"
+- back
+- back
+- tapOn:
+    id: "tab-profile"
+- assertVisible:
+    id: "screen-profile"
+- tapOn:
+    id: "profile-open-about"
+- assertVisible:
+    id: "screen-about"

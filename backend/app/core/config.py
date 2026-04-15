@@ -15,6 +15,7 @@ class Settings(BaseSettings):
       - SMTP_FROM: sender email shown in письме (often same as SMTP_USER)
     """
     DATABASE_URL: str
+    APP_ENV: str = "dev"
     API_PREFIX: str = "/api"
     CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
     CORS_ALLOW_ORIGIN_REGEX: str = r"^https?://(?:localhost|127\.0\.0\.1|\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?$"
@@ -23,6 +24,11 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRES_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRES_DAYS: int = 30
+    AUTH_REFRESH_COOKIE_NAME: str = "usc_refresh_token"
+    AUTH_COOKIE_PATH: str = "/"
+    AUTH_COOKIE_DOMAIN: str = ""
+    AUTH_COOKIE_SAMESITE: str = "lax"
+    AUTH_COOKIE_SECURE: bool = False
 
     REDIS_URL: str = ""
     REDIS_PREFIX: str = "usc"
@@ -82,5 +88,16 @@ class Settings(BaseSettings):
         env_file=str(BASE_DIR / ".env"),
         extra="ignore",
     )
+
+    def model_post_init(self, __context) -> None:
+        env = (self.APP_ENV or "dev").strip().lower()
+        if env in {"dev", "test"}:
+            return
+        if self.JWT_SECRET_KEY == "dev-jwt-secret":
+            raise ValueError("JWT_SECRET_KEY must be changed outside dev/test")
+        if (self.CAPTCHA_PROVIDER or "").strip().lower() == "stub":
+            raise ValueError("CAPTCHA_PROVIDER=stub is not allowed outside dev/test")
+        if bool(self.EMAIL_CODE_DEV_FALLBACK):
+            raise ValueError("EMAIL_CODE_DEV_FALLBACK must be false outside dev/test")
 
 settings = Settings()

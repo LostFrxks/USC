@@ -1,10 +1,10 @@
-import { api } from "./client";
+import { api, bootstrapSession, setAccessToken } from "./client";
 
 type TokenPair = { access: string; refresh?: string };
 
 function storeTokens(data: TokenPair) {
-  localStorage.setItem("usc_access_token", data.access);
-  if (data.refresh) localStorage.setItem("usc_refresh_token", data.refresh);
+  setAccessToken(data.access);
+  localStorage.removeItem("usc_refresh_token");
 }
 
 export async function login(email: string, password: string, captchaToken?: string) {
@@ -77,10 +77,9 @@ export async function verifyEmailCode(payload: {
 
 export async function logoutRequest() {
   const refresh = localStorage.getItem("usc_refresh_token");
-  if (!refresh) return;
   await api<{ revoked: boolean }>("/auth/logout/", {
     method: "POST",
-    body: { refresh },
+    body: refresh ? { refresh } : {},
   }).catch(() => undefined);
 }
 
@@ -92,7 +91,7 @@ export async function logoutAllRequest() {
 }
 
 export function logoutLocal() {
-  localStorage.removeItem("usc_access_token");
+  setAccessToken(null);
   localStorage.removeItem("usc_refresh_token");
 }
 
@@ -100,3 +99,5 @@ export async function logout() {
   await logoutRequest();
   logoutLocal();
 }
+
+export { bootstrapSession };

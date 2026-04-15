@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import and_, insert, select, update
+from sqlalchemy import and_, func, insert, select, update
 from sqlalchemy.orm import Session
 
 from app.db.schema import auth_refresh_session as refresh_sessions
@@ -31,7 +31,11 @@ def create_refresh_session(
     user_agent: str | None,
     metadata: dict | None = None,
 ) -> None:
+    next_id = int(
+        db.execute(select(func.coalesce(func.max(refresh_sessions.c.id), 0) + 1)).scalar_one()
+    )
     values = {
+        "id": next_id,
         "user_id": int(user_id),
         "jti": str(jti),
         "sid": str(sid),
@@ -54,12 +58,18 @@ def get_refresh_session(db: Session, *, jti: str) -> RefreshSessionRow | None:
     )
     if not row:
         return None
+    expires_at = row.get("expires_at")
+    if isinstance(expires_at, datetime) and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    revoked_at = row.get("revoked_at")
+    if isinstance(revoked_at, datetime) and revoked_at.tzinfo is None:
+        revoked_at = revoked_at.replace(tzinfo=timezone.utc)
     return RefreshSessionRow(
         jti=str(row.get("jti")),
         sid=str(row.get("sid")),
         user_id=int(row.get("user_id")),
-        expires_at=row.get("expires_at"),
-        revoked_at=row.get("revoked_at"),
+        expires_at=expires_at,
+        revoked_at=revoked_at,
         replaced_by_jti=row.get("replaced_by_jti"),
     )
 
@@ -84,4 +94,3 @@ def revoke_all_refresh_sessions_for_user(db: Session, *, user_id: int) -> int:
     )
     result = db.execute(stmt)
     return int(result.rowcount or 0)
-

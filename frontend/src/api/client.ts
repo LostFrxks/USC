@@ -5,6 +5,7 @@ export const SESSION_EXPIRED_EVENT = "usc:session-expired";
 
 let lastSessionExpiredEventAt = 0;
 let refreshInFlight: Promise<string | null> | null = null;
+let accessToken: string | null = null;
 const ACCESS_REFRESH_SKEW_SECONDS = 20;
 
 export class ApiError extends Error {
@@ -27,8 +28,30 @@ export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError;
 }
 
+export function setAccessToken(token: string | null) {
+  accessToken = token;
+}
+
+export function hasAccessToken(): boolean {
+  return Boolean(accessToken);
+}
+
+export function resetSessionState() {
+  accessToken = null;
+  refreshInFlight = null;
+  lastSessionExpiredEventAt = 0;
+}
+
 function getToken(): string | null {
-  return localStorage.getItem("usc_access_token");
+  return accessToken;
+}
+
+function getLegacyRefreshToken(): string | null {
+  return localStorage.getItem("usc_refresh_token");
+}
+
+function clearLegacyRefreshToken() {
+  localStorage.removeItem("usc_refresh_token");
 }
 
 function readJwtExp(token: string): number | null {
@@ -53,27 +76,27 @@ function isTokenExpiredOrNear(token: string): boolean {
 }
 
 export function forceLogout(reason: "missing-token" | "unauthorized" = "unauthorized") {
-  localStorage.removeItem("usc_access_token");
-  localStorage.removeItem("usc_refresh_token");
+  setAccessToken(null);
+  clearLegacyRefreshToken();
   emitSessionExpired(reason);
 }
 
 async function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight;
-  const refresh = localStorage.getItem("usc_refresh_token");
-  if (!refresh) return null;
+  const refresh = getLegacyRefreshToken();
 
   refreshInFlight = (async () => {
     const res = await fetch(`${API_BASE}/auth/token/refresh/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh }),
+      credentials: "include",
+      body: JSON.stringify(refresh ? { refresh } : {}),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { access?: string; refresh?: string };
     if (!data?.access) return null;
-    localStorage.setItem("usc_access_token", data.access);
-    if (data.refresh) localStorage.setItem("usc_refresh_token", data.refresh);
+    setAccessToken(data.access);
+    clearLegacyRefreshToken();
     return data.access;
   })()
     .catch(() => null)
@@ -82,6 +105,23 @@ async function refreshAccessToken(): Promise<string | null> {
     });
 
   return refreshInFlight;
+}
+
+export async function bootstrapSession(): Promise<boolean> {
+  if (getToken()) return true;
+  const refreshed = await refreshAccessToken();
+  return Boolean(refreshed || getToken());
+}
+
+export async function ensureAccessToken(): Promise<string | null> {
+  let token = getToken();
+  if (token && isTokenExpiredOrNear(token)) {
+    token = (await refreshAccessToken()) || getToken();
+  }
+  if (!token) {
+    token = (await refreshAccessToken()) || getToken();
+  }
+  return token;
 }
 
 function emitSessionExpired(reason: "missing-token" | "unauthorized") {

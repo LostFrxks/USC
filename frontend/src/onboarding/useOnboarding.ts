@@ -40,8 +40,11 @@ export function useOnboarding({
   }, [stepIndex]);
 
   useEffect(() => {
-    if (!enabled || !context) {
+    if (!context) {
       setIsRunning(false);
+      return;
+    }
+    if (!enabled) {
       return;
     }
 
@@ -130,9 +133,9 @@ export function useOnboarding({
   }, [persist, safeStepsCount]);
 
   const skip = useCallback(() => {
-    setStatus("in_progress");
+    setStatus("completed");
     setIsRunning(false);
-    persist("in_progress", stepIndexRef.current);
+    persist("completed", stepIndexRef.current);
   }, [persist]);
 
   const finish = useCallback(() => {

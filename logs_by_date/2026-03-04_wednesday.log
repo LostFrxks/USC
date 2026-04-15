@@ -1,0 +1,25 @@
+[2026-03-04 17:50:29 +06:00] Prepared full Render deployment checklist for all services (Postgres, Key Value, backend Web Service, frontend Static Site): exact fields/values, required env vars, likely backend failure causes, and post-deploy migration+seed commands.
+
+[2026-03-04 17:52:33 +06:00] Clarified Render backend configuration: where to add environment variables (DATABASE_URL, REDIS_URL, JWT_SECRET_KEY, API/CORS settings) in service Environment section and which values to set.
+
+[2026-03-04 17:53:40 +06:00] Provided exact Render New Web Service field-by-field values for USC backend (Docker runtime), including root/dockerfile paths, free instance selection, required environment variables, pre-deploy migration command, and post-deploy seed/health verification steps.
+
+[2026-03-04 18:00:53 +06:00] Clarified Render auto-deploy behavior: pushes to configured branch trigger rebuild/redeploy when Auto-Deploy is On Commit; changes appear after successful build and health check, otherwise previous deploy stays active.
+
+[2026-03-04 18:04:09 +06:00] Updated logging policy and historical organization: AGENTS.md now requires appending to logs only when code/project files change; created logs_by_date/ with current log split by date (files named YYYY-MM-DD_weekday.log) plus 0000_header.log. Original root logs file kept intact (append-only).
+
+[2026-03-04 18:09:29 +06:00] Logging migration completed: synchronized legacy root logs into logs_by_date (entry count verified 93/93), updated AGENTS.md logging policy to daily logs_by_date files, and removed root logs file as requested.
+
+[2026-03-04 18:16:04 +06:00] Fixed Render port binding compatibility: updated backend/Dockerfile CMD to bind uvicorn to  instead of hardcoded 8000, so Render Web Service can detect open port and complete deploy.
+
+[2026-03-04 19:23:46 +06:00] Fixed Render startup robustness for free tier: backend Dockerfile CMD now runs migrations and starts app in one command (alembic upgrade head && python -m uvicorn ... --port ), removing dependence on locked Pre-Deploy and fragile Docker Command quoting in Render UI.
+
+[2026-03-04 19:26:07 +06:00] Git push completed: pushed commit 11a33d5 to origin/main with Render startup fix in backend Dockerfile and logging-policy migration changes (AGENTS.md + removal of legacy root logs file).
+
+[2026-03-04 19:57:02 +06:00] Fixed AUTO_SEED_DEMO flow for Render startup: backend Dockerfile CMD now conditionally runs python scripts/seed_demo.py when AUTO_SEED_DEMO=true before starting uvicorn. This enables one-click seed on free tier without Render shell access.
+
+[2026-03-04 20:13:06 +06:00] Auth UX improvement: added loading progress bar animation on login buttons in AuthScreen while busy (email and phone login flows), with aria-busy and dynamic label '¬ходим...'. Updated styles in screens.css (.auth-login-submit + keyframes). Verified frontend build success.
+
+[2026-03-04 20:23:00 +06:00] Frontend UX fixes: preloaded splash logo assets in frontend/index.html and marked splash images eager/high-priority in App.tsx to avoid delayed USC letter appearance; fixed Home scrolling by removing vertical clipping on #screen-home (overflow-x only); strengthened product card tap/open behavior in ProductCard.tsx (explicit open handler on card/image/body) so details sheet opens reliably on mobile. Verified with npm run build.
+
+[2026-03-04 20:24:44 +06:00] Finalized Home scroll fix: switched #screen-home horizontal clipping to overflow-x:hidden with overflow-y:visible for broad mobile browser compatibility. Re-verified frontend production build.

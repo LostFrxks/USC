@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, ensureAccessToken, forceLogout } from "./client";
 import { API_BASE } from "../config";
 
 export type AnalyticsSummary = {
@@ -249,12 +249,16 @@ export async function streamAnalyticsAssistant(
     signal?: AbortSignal;
   } = {}
 ): Promise<AnalyticsAssistantResponse> {
-  const token = localStorage.getItem("usc_access_token");
+  const token = await ensureAccessToken();
+  if (!token) {
+    forceLogout("missing-token");
+    throw new Error("Missing access token");
+  }
   const res = await fetch(`${API_BASE}/analytics/assistant/query/stream`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
       company_id: params.companyId,

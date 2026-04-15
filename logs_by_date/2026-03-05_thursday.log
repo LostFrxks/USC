@@ -1,0 +1,8 @@
+
+[2026-03-05 08:21:11 +06:00] Fixed AuthScreen encoding issue: restored frontend/src/screens/AuthScreen.tsx to valid UTF-8 from HEAD, reapplied login button loading class (auth-login-submit) with aria-busy, and corrected Russian labels/messages ('Входим...', 'Войти', 'Блокировка: N сек'). Verified with frontend build (npm run build).
+
+[2026-03-05 08:26:09 +06:00] Updated login button loading progress bar visuals in frontend/src/styles/screens.css: added rounded track (::before) and rounded animated capsule (::after) for a fully circular-style indicator on Auth screen. Verified with frontend build (npm run build).
+
+[2026-03-05 08:28:28 +06:00] Fixed Home scroll/layout overlap with tabbar: updated #screen-home padding in frontend/src/styles/screens.css to include explicit bottom safe-area offset (var(--tabbar-space) + env(safe-area-inset-bottom) + 14px), preventing product cards/buttons from being covered by bottom navigation. Verified with frontend build (npm run build).
+
+[2026-03-05 09:23:00 +06:00] Home UX/performance polish: removed chain backgrounds on Home by disabling #screen-home::before and .home-card::before in screens.css; removed category blue focus glow by disabling category pseudo highlight and focus outline (kept active behavior via color+scale); reduced product image card height to 172px for better fold density; implemented products caching, in-flight dedupe, category prefetch (1..6), and image preloading in frontend/src/hooks/useProducts.ts to make category switches appear immediately with stable quality. Verified frontend build (npm run build).

@@ -1,0 +1,59 @@
+appId: com.usc.mobile
+---
+- launchApp
+- assertVisible: "USC Mobile"
+- tapOn:
+    id: "demo-login-supplier1"
+- tapOn:
+    id: "company-option-20"
+    optional: true
+- tapOn:
+    id: "onboarding-skip"
+    optional: true
+- assertVisible:
+    id: "screen-home-supplier"
+- tapOn:
+    id: "tab-publications"
+- assertVisible:
+    id: "screen-publications"
+- tapOn:
+    id: "publication-create-name"
+- inputText: "Golden Maestro SKU"
+- tapOn:
+    id: "publication-create-price"
+- inputText: "155"
+- tapOn:
+    id: "publication-create-stock-qty"
+- inputText: "12"
+- tapOn:
+    id: "publication-create-category-0"
+- tapOn:
+    id: "publication-create-submit"
+- tapOn:
+    id: "tab-deliveries"
+- assertVisible:
+    id: "screen-deliveries"
+- tapOn:
+    id: "tab-orders"
+- assertVisible:
+    id: "screen-orders"
+- tapOn:
+    id: "tab-home"
+- tapOn:
+    id: "open-analytics"
+- assertVisible:
+    id: "screen-analytics"
+- tapOn:
+    id: "analytics-open-ai"
+- assertVisible:
+    id: "screen-ai"
+- back
+- back
+- tapOn:
+    id: "tab-profile"
+- assertVisible:
+    id: "screen-profile"
+- tapOn:
+    id: "profile-open-help"
+- assertVisible:
+    id: "screen-help"

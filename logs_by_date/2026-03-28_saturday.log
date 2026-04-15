@@ -1,0 +1,56 @@
+2026-03-28 12:46:16 +06:00
+- Stabilized frontend quality checks: fixed lint warnings, added deterministic test cleanup, serialized Vitest file execution, and increased suite timeout to eliminate flaky timeouts.
+- Added cookie-based refresh session support in backend auth endpoints with legacy refresh-body fallback, configurable auth cookie settings, and stricter non-dev security defaults.
+- Updated frontend auth client to stop persisting refresh tokens locally, use credentialed refresh requests, and support silent session bootstrap from refresh cookies.
+- Added backend auth cookie tests and refreshed environment/documentation references for backend port, APP_ENV, and auth cookie configuration.
+
+2026-03-28 12:49:44 +06:00
+- Completed frontend session hardening by moving access tokens to in-memory session state, removing direct `usc_access_token` storage usage, and updating session/bootstrap consumers to use shared helpers.
+- Updated analytics streaming and notifications session checks to rely on the centralized in-memory access token flow.
+- Revalidated frontend lint/tests and backend test suite after the memory-only access token transition.
+
+2026-03-28 13:00:29 +06:00
+- Reduced `App.tsx` responsibility by extracting auth bootstrap, profile loading, company selection, notification polling, and logout/session-expiry orchestration into a dedicated `useAppSession` hook.
+- Extracted backend auth cookie and token issuance helpers into dedicated service modules to trim router responsibilities without changing endpoint behavior.
+- Revalidated frontend lint/tests and backend test suite after the frontend session-hook and backend auth-service decomposition.
+
+2026-03-28 13:07:32 +06:00
+- Began analytics router decomposition by extracting analytics cache-key/insight cache helpers, insight generation helpers, and NDJSON/LLM streaming helpers into dedicated backend service modules.
+- Rewired analytics endpoints to use the extracted helper services while preserving existing API behavior and test coverage.
+- Revalidated frontend lint/tests and backend test suite after the analytics helper extraction.
+
+2026-03-28 13:16:38 +06:00
+- Completed the current analytics refactor pass by fixing remaining helper wiring and restoring green backend tests after the extraction of analytics service modules.
+- Kept frontend quality gates green while preserving the new session/auth architecture and the partial analytics router decomposition.
+
+2026-03-28 13:19:47 +06:00
+- Extracted analytics assistant logic into a dedicated backend service module and rewired router assistant flows to use the new service-layer implementation.
+- Revalidated backend tests plus frontend lint/unit checks after the analytics assistant service split.
+
+2026-03-28 13:23:58 +06:00
+- Improved AI chat persistence on the frontend by creating remote chat sessions before sending messages, syncing chat history from backend sessions, and preserving access to older server-side chats from the chat sidebar.
+- Revalidated frontend lint/tests and backend test suite after the AI chat history synchronization changes.
+
+2026-03-28 13:27:54 +06:00
+- Added AI chat rename/delete controls in the frontend chat sidebar and kept server-side chat session state synchronized after those operations.
+- Revalidated frontend lint/tests and backend test suite after the AI chat sidebar management changes.
+
+2026-03-28 13:37:03 +06:00
+- Fixed splash screen flicker on login by decoupling splash visibility from profile loading so the onboarding flow no longer re-triggers splash visibility transitions after the entry animation.
+- Revalidated frontend lint/tests and backend test suite after the splash/onboarding timing fix.
+
+2026-03-28 13:40:25 +06:00
+- Investigated repeated frontend request errors and confirmed the current frontend/backend endpoints respond normally; the visible login flicker was caused by splash/onboarding state timing rather than broken media/API serving.
+- Verified the splash timing fix remains green across frontend lint/tests and backend tests.
+
+2026-03-28 13:45:57 +06:00
+- Hardened the post-login splash flow by preventing the main application shell from mounting until the splash lifecycle completes, avoiding heavy screen/effect initialization under the splash overlay.
+- Revalidated frontend lint/tests and backend test suite after the splash gating change.
+
+2026-03-28 14:59:33 +06:00
+- Fixed onboarding guide flicker by preventing transient `enabled=false` states from stopping an already running guide; the guide now survives temporary profile/loading/UI gating changes instead of unmounting and restarting.
+- Added a regression test covering transient disabled periods in the onboarding hook and revalidated frontend lint/tests plus backend tests.
+
+2026-03-28 15:35:53 +06:00
+- Fixed onboarding target-zone interaction by preventing the scrim layer from intercepting pointer events, allowing taps/clicks to pass through to highlighted guide targets.
+- Revalidated frontend onboarding tests and backend tests after the onboarding interaction-layer fix.

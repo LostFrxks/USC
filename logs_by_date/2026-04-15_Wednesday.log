@@ -1,0 +1,4 @@
+2026-04-15 13:48:02
+- Updated backend auth/session flows with cookie and token services, refresh-session changes, and related API/tests.
+- Expanded analytics and delivery/order capabilities, including new assistant/cache/insight services and delivery coordinate support.
+- Refreshed frontend app/session/cart/chat/orders flows, added mobile/shared modules, and updated repo/docker/docs configuration files.

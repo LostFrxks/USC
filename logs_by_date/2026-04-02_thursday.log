@@ -1,0 +1,165 @@
+2026-04-02 18:32:07 +06:00
+- Created a new rontend_mobile/ Expo Router app for the buyer-first mobile MVP with env/config scaffolding, local docs, and bundled catalog fallback assets.
+- Added repo-level shared/usc-core/ with reusable transport/session logic, domain types, geo helpers, cart/idempotency utilities, and API wrappers for profile, companies, catalog, orders, deliveries, notifications, analytics, and AI chat.
+- Implemented buyer mobile foundations and flows: secure token bootstrap, selected buyer company resolution, cart persistence, auth/register/verify routes, home catalog, supplier drill-in, checkout, buyer orders/detail, notifications, profile, and company picker.
+- Validated the new mobile package with 
+pm run typecheck and 
+pm test -- --runInBand inside rontend_mobile.
+
+2026-04-02 18:33:20 +06:00
+- Created a new frontend_mobile Expo Router app for the buyer-first mobile MVP with env/config scaffolding, local docs, and bundled catalog fallback assets.
+- Added repo-level shared/usc-core with reusable transport/session logic, domain types, geo helpers, cart/idempotency utilities, and API wrappers for profile, companies, catalog, orders, deliveries, notifications, analytics, and AI chat.
+- Implemented buyer mobile foundations and flows: secure token bootstrap, selected buyer company resolution, cart persistence, auth/register/verify routes, home catalog, supplier drill-in, checkout, buyer orders/detail, notifications, profile, and company picker.
+- Validated the new mobile package with npm run typecheck and npm test -- --runInBand inside frontend_mobile.
+
+2026-04-02 19:01:10 +06:00
+- Extended frontend_mobile from buyer-only flow to active-company-driven mode selection, so buyer and supplier workspaces now derive from the selected company type instead of buyer-only storage.
+- Added supplier mobile surfaces: supplier hub home state, inbox/outbox orders, supplier confirm actions, deliveries status management, supplier publications CRUD, and profile/company editing route.
+- Updated notifications and profile/company switching flows to be role-aware for both buyer and supplier company contexts.
+- Revalidated frontend_mobile with npm run typecheck and npm test -- --runInBand after the supplier phase additions.
+
+2026-04-02 19:18:40 +06:00
+- Added analytics and AI routes to frontend_mobile, wiring both buyer and supplier home states to separate Analytics and AI stack screens.
+- Extended shared/usc-core analytics and AI client layers with normalized what-if response/scenario handling and corrected AI chat session normalization for mobile consumption.
+- Implemented simplified mobile analytics summary, persisted AI chat sessions, role-aware quick prompts, and a compact what-if simulator/saved-scenario flow on top of the existing backend endpoints.
+- Revalidated frontend_mobile with npm run typecheck and npm test -- --runInBand after the analytics/AI phase.
+
+2026-04-02 19:34:05 +06:00
+- Hardened frontend_mobile analytics and AI phase by replacing mojibake-tainted screen strings with clean content, adding stable test IDs for auth/cart/analytics/AI smoke interactions, and refreshing the local mobile README/smoke flow docs.
+- Added dedicated analytics/AI normalization tests for shared/usc-core transport clients, covering analytics summary, what-if response/scenario mapping, and AI chat session normalization.
+- Replaced the placeholder Maestro file with separate buyer and supplier smoke flow stubs aligned to the current mobile route surface.
+- Revalidated frontend_mobile with npm run typecheck and npm test -- --runInBand after the hardening pass.
+
+2026-04-02 19:45:30 +06:00
+- Added rename flows for mobile AI chat sessions and saved what-if scenarios, closing a parity gap in the frontend_mobile AI workspace.
+- Added session bootstrap/refresh behavior tests for the shared mobile SessionManager and expanded the frontend_mobile test suite beyond pure normalization checks.
+- Upgraded Maestro smoke stubs to reference real mobile test IDs for auth, analytics, and AI entry points instead of a launch-only placeholder flow.
+- Revalidated frontend_mobile with npm run typecheck and npm test -- --runInBand after the AI/session hardening pass.
+
+2026-04-02 20:06:50 +06:00
+- Added explicit delivery coordinate support to the backend order schema and API with a new Alembic migration, while preserving backward compatibility through the legacy [geo:lat,lng] comment tag.
+- Updated shared/usc-core, frontend, and frontend_mobile order clients/screens to send and consume delivery_lat/delivery_lng, with fallback parsing for older orders that only store geo in comment text.
+- Added backend geo-contract tests plus updated web checkout tests, and revalidated backend pytest targets, frontend CartScreen vitest, frontend build, and frontend_mobile typecheck/jest.
+
+2026-04-02 20:18:15 +06:00
+- Hardened the mobile supplier publications flow by extracting draft helpers, adding payload validation, and preserving dirty local drafts across server refetches instead of blindly resetting form state.
+- Removed raw geo-tag leakage from migrated order list UIs by introducing stripGeoTag helpers in shared and web geo utilities, and aligned the legacy web CheckoutModal contract to explicit delivery_lat/delivery_lng payloads.
+- Added new draft/helper tests in frontend_mobile and updated web geo/checkout tests, then revalidated frontend vitest targets, frontend production build, and frontend_mobile typecheck/jest.
+
+2026-04-02 20:29:40 +06:00
+- Extended supplier logistics parity by adding assignable courier lookup in the backend deliveries router plus shared mobile delivery client support for courier listing and delivery upsert flows.
+- Upgraded frontend_mobile DeliveriesScreen from a status-only surface to an editable supplier delivery tool with courier assignment, tracking link editing, and notes editing on top of deliveries/upsert_for_order.
+- Added backend tests for assignable courier permissions/listing and frontend_mobile delivery client tests, then revalidated backend pytest plus frontend_mobile typecheck/jest.
+
+2026-04-02 20:42:10 +06:00
+- Extended shared mobile auth/session infrastructure with phone code request/verify support and added SessionManager tests covering phone auth paths.
+- Reworked frontend_mobile LoginScreen into dual-mode email/password and phone/code auth with friendlier auth error mapping for rate-limit/lockout/captcha-style backend responses.
+- Updated frontend_mobile README to reflect the new phone login capability and revalidated the mobile package with typecheck and jest.
+
+2026-04-02 20:52:25 +06:00
+- Extended frontend_mobile auth parity to support buyer registration through phone code verification on top of the existing backend /auth/phone/verify flow.
+- Added shared/session support for buyer phone registration and upgraded the mobile RegisterScreen into dual-mode email and phone registration while preserving the existing email verify route.
+- Updated frontend_mobile docs to reflect phone-based buyer registration and revalidated the package with typecheck and jest.
+
+2026-04-02 21:03:50 +06:00
+- Hardened frontend_mobile auth UX by adding cooldown timers, lockout countdown handling, and optional captcha-token input paths for backend auth-guard responses in both login and registration flows.
+- Upgraded the mobile RegisterScreen to full dual-mode buyer registration (email verify and phone verify) while preserving the existing email draft/verify route.
+- Added dedicated auth error parsing tests and revalidated frontend_mobile with typecheck and jest.
+
+2026-04-02 21:20:15 +06:00
+- Added full password reset flow with backend request/confirm endpoints, shared mobile session-manager support, and frontend_mobile forgot/reset auth routes.
+- Wired reset UX into the mobile login screen and covered the new reset path with backend pytest plus SessionManager tests in frontend_mobile.
+- Updated frontend_mobile docs to include password reset support and revalidated mobile typecheck/jest after the auth parity expansion.
+
+2026-04-02 21:31:30 +06:00
+- Added mobile demo-account shortcuts on the frontend_mobile login screen to speed up buyer/supplier smoke checks and mentor/demo usage.
+- Upgraded Maestro coverage from generic placeholders to separate buyer, supplier, and auth-reset smoke stubs that target real mobile test IDs and auth entry points.
+- Updated frontend_mobile docs to document demo shortcuts and the current Maestro smoke files, then revalidated the mobile package with typecheck and jest.
+
+2026-04-02 21:45:20 +06:00
+- Added broader testID coverage across frontend_mobile screens and core UI primitives to make buyer/supplier/profile/auth flows easier to automate and verify.
+- Cleaned up the remaining company picker text artifact and upgraded Maestro smoke files to target the new demo-login shortcuts plus concrete buyer/supplier/reset route surfaces.
+- Revalidated frontend_mobile with typecheck and jest after the automation-readiness pass.
+
+2026-04-02 22:02:40 +06:00
+- Ported the remaining service/info screens from the web app into frontend_mobile by adding About, Help, and FAQ mobile routes with profile navigation entry points.
+- Expanded mobile profile navigation with stable test IDs and direct links to company switch, profile edit, help, about, FAQ, and logout actions.
+- Revalidated frontend_mobile with typecheck and jest after the service-screen parity pass.
+
+2026-04-02 22:11:30 +06:00
+- Ported a mobile onboarding layer with AsyncStorage-backed state/replay flags, route-aware guide steps for buyer and supplier modes, and a global overlay rendered through frontend_mobile providers.
+- Wired the About screen advanced panel to the real onboarding replay/restart controls instead of a placeholder toggle and updated mobile docs to reflect onboarding support.
+- Added onboarding storage tests and revalidated frontend_mobile with typecheck and jest after the onboarding parity pass.
+
+2026-04-02 22:19:20 +06:00
+- Improved mobile execution readiness by aligning Maestro smoke files with real screen/action test IDs across buyer, supplier, analytics, AI, profile, and password-reset surfaces.
+- Added/extended stable test IDs across remaining frontend_mobile screens and UI primitives so runtime automation can target concrete app states instead of placeholder selectors.
+- Revalidated frontend_mobile with typecheck and jest after the automation selector pass.
+
+2026-04-02 22:37:55 +06:00
+- Expanded shared analytics contracts with typed alerts/actions/buyer modules/supplier modules and buyer recommendations instead of generic nested records.
+- Upgraded frontend_mobile AnalyticsScreen to render alerts, priority actions, buyer-specific recommendation sections, and supplier-specific competitiveness/retention/leakage sections on top of the existing summary cards.
+- Extended analytics client normalization tests and revalidated frontend_mobile with typecheck and jest after the richer analytics parity pass.
+
+2026-04-02 22:56:40 +06:00
+- Added mobile AI streaming support through shared analytics client streaming helpers and wired frontend_mobile AI chat to show progressive assistant output with fallback to the non-streaming query endpoint.
+- Expanded frontend_mobile analytics normalization tests to cover the new streaming assistant path and updated docs to reflect streaming AI replies.
+- Revalidated frontend_mobile with typecheck and jest after the AI streaming parity pass.
+
+2026-04-02 23:08:05 +06:00
+- Added broader automation readiness for frontend_mobile by extending screen/action test IDs across notifications, order detail, publications, analytics, AI, company picker, profile edit, and onboarding surfaces.
+- Added Maestro npm scripts plus a dedicated onboarding smoke file, and refreshed the existing buyer/supplier/auth-reset smoke files to follow the new stable selectors and demo-account shortcuts.
+- Revalidated frontend_mobile with typecheck and jest after the execution-readiness pass.
+
+[23:42] Mobile execution-readiness pass: added stable automation testIDs across buyer cart/orders, supplier publications, auth reset, product cards, and home hub surfaces; rewrote buyer/supplier/auth-reset/onboarding Maestro flows from optional smoke stubs into stricter golden flows; added `maestro:golden` npm script and updated frontend_mobile README.
+[23:58] Mobile checkout parity: added in-app interactive map picker via react-native-webview + Leaflet in frontend_mobile, wired it into CartScreen as a third geo input path alongside current-location and manual coordinates, updated buyer Maestro flow to open/confirm the map picker, and refreshed frontend_mobile README scope.
+[00:09] Supplier publications parity pass: added reusable mobile helper logic for low-stock detection, search/filtering, and supplier SKU stats; upgraded frontend_mobile PublicationsScreen with KPI cards, search, stock filters, dirty/low-stock badges, empty filtered state, and save-disabled-until-dirty UX; extended publicationsDraft tests and refreshed mobile README scope.
+[00:20] Order journey parity pass: added tested mobile helper layer for order timeline, totals, delivery status options, and created-at formatting; upgraded frontend_mobile OrderDetailScreen with loading state, journey timeline, total summary, comment cleanup, OSM geo link helper usage, richer delivery card, and inline delivery status controls; refreshed mobile README scope.
+[00:33] Analytics visual parity pass: added tested mobile helper layer for trend/category/funnel bar visuals, upgraded frontend_mobile AnalyticsScreen with chart-like revenue/market/category/funnel cards plus stronger KPI rollup and richer buyer/supplier module presentation, and refreshed mobile README analytics scope.
+[00:47] AI/what-if parity pass: added tested helper layer for scenario compare/drilldown visuals and delta formatting, upgraded frontend_mobile AIScreen with richer assistant metric cards, probable-causes rendering, visual what-if compare/drilldown blocks, confidence/warnings display, scenario discuss-in-chat action, and stronger saved-scenario previews; refreshed mobile README AI scope.
+[01:07] Courier profile parity pass: extended backend /profile/me contract to update is_courier_enabled, added backend unit/integration assertions plus seed helper support, propagated the field through shared profile API and web typings, and upgraded mobile ProfileScreen/ProfileEditScreen with visible courier status and a real courier availability toggle tied to profile updates.
+[01:29] What-if control parity pass: added tested mobile helper layer for scenario presets, active lever summaries, and restoring drafts from saved scenario levers; upgraded frontend_mobile AIScreen with horizon/drilldown controls, soft/balanced/boost presets, active lever chips, and full state restore when loading saved scenarios; refreshed mobile README what-if scope.
+[01:43] AI month-context parity pass: added tested helper layer for month chip options from analytics trends, wired selectedMonth through frontend_mobile AI chat streaming/query and what-if simulation/save/restore flows, exposed month focus controls in AIScreen, and refreshed mobile README what-if scope.
+[01:58] Scenario theater parity pass: added tested mobile helper layer for what-if headline, pressure cards, and decision cards; upgraded frontend_mobile AIScreen with scenario signal hero, pressure board, and action-oriented decision cards inside what-if results; refreshed mobile README what-if scope.
+[02:10] Scenario theater expansion: added tested mobile helper layer for money-flow cards and scenario acts, upgraded frontend_mobile AIScreen with money-flow infographic and scenario acts blocks inside what-if results, and refreshed mobile README scenario theater scope.
+[02:23] Scenario theater cascade pass: expanded mobile what-if theater with tested impact cascade nodes, connected them into frontend_mobile AIScreen, and refreshed the README to reflect cascade/money-flow/acts parity.
+[02:41] Design-system chrome pass: tightened enterprise-style global UI surfaces in frontend_mobile by adding reusable card shadows in theme, upgrading Screen header into a raised workspace panel with clearer hierarchy, and refining primary/secondary buttons plus header notification action with stronger pressed states and more consistent business chrome.
+[02:49] Analytics-to-AI workflow pass: added month-focused AI handoff prompt builder, made analytics revenue/market trend bars actionable, wired route-param handoff into frontend_mobile AIScreen with one-shot autorun and month-scoped context banner, and refreshed mobile README to reflect the new cross-screen workflow.
+[02:58] Help hub parity pass: replaced the mock mobile help chat with a role-aware operational support hub, added tested support quick-action and reply helpers, wired HelpScreen shortcuts into orders/cart/deliveries/publications/AI flows, and refreshed the mobile README support scope.
+[03:13] Service center expansion: added tested service-center helpers for FAQ filtering and AI support prompts, upgraded AboutScreen with service shortcuts, and turned FaqScreen into a searchable/filterable workflow surface with direct AI and route handoffs.
+[03:27] Workspace management pass: added tested company-workspace helpers for classification, search, grouping, and summary stats; upgraded frontend_mobile CompanyPickerScreen into a grouped buyer/supplier workspace switcher with search, summary cards, and current-workspace panel; refreshed mobile README workspace scope.
+[03:41] Orders dashboard pass: added tested order-dashboard helpers for stats, filtering, and sorting; upgraded frontend_mobile OrdersScreen with summary cards, order search, improved empty states, and stronger buyer/supplier list filtering; refreshed mobile README orders scope.
+[04:02] Shared business UI rollout: introduced reusable frontend_mobile BusinessUI primitives and applied them across high-surface screens (home, orders, notifications, company picker, profile), aligning stats/cards/filter chips/meta tags under one enterprise-style mobile system; also cleaned the profile identity banner copy.
+[04:19] Buyer-critical design-system rollout: extended the shared mobile business template onto cart and order-detail flows, and completed broader high-surface adoption across home/orders/notifications/company-picker/profile/analytics/ai so frontend_mobile now reads much more like one coherent native enterprise product.
+[04:34] Shared template expansion: extended the new mobile business template onto supplier operations and service/support surfaces, translating deliveries, publications, about/help/faq/supplier-gated screens into the same hero/card/filter/tag language and keeping frontend_mobile validation green.
+[04:53] Auth and supplier-entry template pass: rolled the shared mobile business template onto login/register/verify/reset flows plus the supplier catalog entry screen, aligning first-run/auth and supplier drill-in surfaces with the same hero/card/filter language used across the rest of frontend_mobile.
+[05:11] Core UI template pass: pushed the new mobile design language down into shared primitives (text fields, empty/loading states, product cards, product modal, map modal), so frontend_mobile now carries the same elevated enterprise-style chrome and component behavior almost everywhere.
+[05:29] Screen-layer template completion: finished rolling the new mobile business template across the remaining auth/profile-edit/supplier-entry surfaces and aligned the last screen-specific styling leftovers with shared theme tokens, leaving frontend_mobile with essentially a full-screen-set unified design system.
+[05:43] Action-card system pass: introduced shared action-card primitives in BusinessUI and rolled them into home/help/about service and workflow shortcuts, reducing the remaining ad-hoc interactive card patterns and tightening the unified mobile template.
+[06:01] Dense-surface template pass: extended the new shared mobile template into reusable action-card and data-row primitives, then applied them across analytics, notifications, home, help and about surfaces to reduce remaining ad-hoc list/card treatments while keeping frontend_mobile fully green.
+[06:18] Conversation/action unification pass: completed shared message-stack support and stabilized action-card usage across home/help/about flows, so the new mobile template now spans layout, actions, dense data rows, and chat/support surfaces consistently across frontend_mobile.
+[06:43] Residual pattern cleanup: replaced remaining local demo account cards and courier selection chips with shared action-card/filter-chip patterns, further reducing ad-hoc interaction styling and tightening the new template across frontend_mobile.
+[06:58] Metric-language unification: replaced remaining local AI/what-if metric card blocks with the same shared stat-tile language used across the rest of frontend_mobile, further tightening the new template across layout, actions, dense data rows, and scenario metrics.
+[07:12] Global chrome pass: upgraded the mobile tab bar into a rounded, elevated floating-style application chrome so the new template now covers not just screens and components but also cross-screen navigation framing.
+[07:26] Final template hardening pass: confirmed the shared mobile template now spans auth, workspace dashboards, supplier operations, analytics/AI, support surfaces, action cards, dense data rows, and message bubbles; validated frontend_mobile remains green after the latest conversation/action/data unification work.
+[07:52] Micro-pattern cleanup: completed rollout of shared action-card and message-stack primitives across remaining home/help/about flows and stabilized the underlying BusinessUI exports, keeping the whole redesigned frontend_mobile green.
+[08:06] Sheet-language pass: introduced a shared SheetFrame component and migrated product-details and map-picker modals onto the same elevated mobile sheet treatment, tightening modal interactions into the new app-wide template.
+[08:24] Global ambience pass: upgraded the shared Screen chrome with ambient background shapes, cleaner scroll ergonomics, and a more atmospheric workspace backdrop, so the new mobile template now influences the feel of every screen even before per-screen content renders.
+[08:41] Form-flow usability pass: shifted auth and profile-edit screens toward more natural scrollable behavior and better keyboard-friendly ergonomics, tightening the mobile UX beyond visual consistency alone while keeping frontend_mobile fully green.
+[08:56] AI interaction cleanup: replaced the remaining local chat-session and saved-scenario card treatments in AIScreen with the shared action-card system, further reducing ad-hoc patterns inside the app's densest screen while keeping frontend_mobile green.
+[08:43] Home discovery polish: migrated the remaining home supplier/discovery cards and category controls into the shared action/filter language, further reducing visual drift in the app's first-run browsing experience.
+[design] Unified AIScreen what-if inner surfaces with shared InsetPanel tones, removed residual ad-hoc translucent cards, and kept frontend_mobile green on typecheck + jest (22 suites / 71 tests).
+[design] Refined AnalyticsScreen into a more mobile-first dashboard: inset trend rows, structured insights, stat-based supplier/buyer modules, reduced duplicate helper copy, and kept frontend_mobile green on typecheck + jest (22 suites / 71 tests).
+[design] Refined OrderDetailScreen into a more mobile-first operational flow: structured status rows, toned journey panels, data-row items, delivery summary panel, and unified delivery status chips via shared BusinessUI patterns; frontend_mobile stays green on typecheck + jest (22 suites / 71 tests).
+[design] Refined DeliveriesScreen into a clearer mobile operations flow: toned delivery summary panel, structured assignment rows, dedicated status control block, and neutral inset editor form; frontend_mobile remains green on typecheck + jest (22 suites / 71 tests).
+[design] Refined PublicationsScreen into a clearer supplier SKU workspace: filter summary panel, grouped create flow, per-SKU summary inset, neutral edit block, and dedicated settings panel; frontend_mobile stays green on typecheck + jest (22 suites / 71 tests).
+[design] Refined NotificationsScreen into a more mobile-first inbox: added hero banner, unified inbox controls, visible filter summary, toned unread notification panels, and clearer read/open/confirm action hierarchy; frontend_mobile remains green on typecheck + jest (22 suites / 71 tests).
+[design] Refined CompanyPickerScreen into a clearer mobile workspace switcher: added hero banner, workspace controls summary, toned current-workspace panel, grouped section cards, and explicit switch actions; frontend_mobile remains green on typecheck + jest (22 suites / 71 tests).
+[design] Refined ProfileScreen into a clearer mobile account/workspace hub: added profile summary stats, toned active-company panel, action-card workspace/support shortcuts, structured memberships list, and grouped session actions; frontend_mobile remains green on typecheck + jest (22 suites / 71 tests).
+[design] Refined ProfileEditScreen into a clearer mobile settings flow: added workspace summary, profile stats, separate personal/courier/company sections, toned courier toggle panel, and grouped save actions; frontend_mobile remains green on typecheck + jest (22 suites / 71 tests).
+[design] Refined HelpScreen and FaqScreen into a stronger mobile service center: added role/context summaries, service search/result blocks, clearer FAQ category tags, and better support prompt guidance; frontend_mobile remains green on typecheck + jest (22 suites / 71 tests).
+[design] Refined AboutScreen to match the service-center cluster: added summary stats, cleaned version/scope block, explicit service routing summary, and stronger advanced onboarding controls; frontend_mobile remains green on typecheck + jest (22 suites / 71 tests).
+[design] Refined LoginScreen and RegisterScreen into stronger mobile auth-entry surfaces: added summary stats, access/verification state panels, grouped auth forms, seeded/demo summary, and clearer next-step action cards; frontend_mobile remains green on typecheck + jest (22 suites / 71 tests).
+[design] Refined VerifyEmailScreen, ForgotPasswordScreen, and ResetPasswordScreen into a unified mobile auth-recovery cluster: added summary stats, verification/recovery state panels, clearer next-step actions, and removed remaining plain-form feel; frontend_mobile remains green on typecheck + jest (22 suites / 71 tests).
+[design] Refined supplier discovery surfaces: SupplierScreen gained catalog stats and search summary, SupplierGatedScreen became a clearer access gate, and ProductCard was upgraded into a stronger mobile commerce card reused across home and supplier catalog; frontend_mobile remains green on typecheck + jest (22 suites / 71 tests).
+[design] Refined modal and sheet surfaces: SheetFrame gained stronger separation, ProductDetailsModal now has structured product facts/meta, and MapPickerModal got an explicit live center summary for clearer tactile flow; frontend_mobile remains green on typecheck + jest (22 suites / 71 tests).

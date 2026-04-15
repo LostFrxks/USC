@@ -81,7 +81,7 @@ describe("CartScreen map checkout", () => {
     expect(screen.getByText("Координаты не будут добавлены")).toBeInTheDocument();
   });
 
-  it("sends geo tag in comment when creating order", async () => {
+  it("sends explicit delivery coordinates when creating order", async () => {
     render(<CartScreen {...baseProps} />);
     fireEvent.click(screen.getByTestId("cart-open-checkout"));
 
@@ -94,7 +94,9 @@ describe("CartScreen map checkout", () => {
 
     expect(mockCreateOrder).toHaveBeenCalledWith(
       expect.objectContaining({
-        comment: "[geo:42.874600,74.569800]",
+        comment: "",
+        delivery_lat: 42.8746,
+        delivery_lng: 74.5698,
       })
     );
   });

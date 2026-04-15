@@ -37,6 +37,7 @@ def seed_user(
     password: str = "pass123456",
     first_name: str = "Test",
     last_name: str = "User",
+    is_courier_enabled: bool = False,
 ) -> None:
     db.execute(
         insert(accounts_user).values(
@@ -49,7 +50,7 @@ def seed_user(
                 "first_name": first_name,
                 "last_name": last_name,
                 "phone": phone,
-                "is_courier_enabled": False,
+                "is_courier_enabled": is_courier_enabled,
                 "is_active": True,
                 "is_staff": False,
                 "created_at": now_utc(),
@@ -139,6 +140,8 @@ def seed_order(
     status: str,
     delivery_mode: str = "YANDEX",
     delivery_address: str | None = None,
+    delivery_lat: Decimal | None = None,
+    delivery_lng: Decimal | None = None,
     comment: str = "",
 ) -> None:
     db.execute(
@@ -148,6 +151,8 @@ def seed_order(
                 "status": status,
                 "delivery_mode": delivery_mode,
                 "delivery_address": delivery_address,
+                "delivery_lat": delivery_lat,
+                "delivery_lng": delivery_lng,
                 "comment": comment,
                 "created_at": now_utc(),
                 "buyer_company_id": buyer_company_id,

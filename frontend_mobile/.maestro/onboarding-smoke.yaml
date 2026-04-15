@@ -1,0 +1,35 @@
+appId: com.usc.mobile
+---
+- launchApp
+- assertVisible: "USC Mobile"
+- tapOn:
+    id: "demo-login-buyer1"
+- tapOn:
+    id: "company-option-10"
+    optional: true
+- tapOn:
+    id: "onboarding-skip"
+    optional: true
+- tapOn:
+    id: "tab-profile"
+- tapOn:
+    id: "profile-open-about"
+- assertVisible:
+    id: "screen-about"
+- repeat:
+    times: 5
+    commands:
+      - tapOn:
+          id: "about-version"
+- assertVisible:
+    id: "about-advanced"
+- tapOn:
+    id: "about-start-guide-now"
+- assertVisible:
+    id: "onboarding-overlay"
+- tapOn:
+    id: "onboarding-next"
+- tapOn:
+    id: "onboarding-skip"
+- assertVisible:
+    id: "screen-about"

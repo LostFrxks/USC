@@ -2248,7 +2248,7 @@
   left: var(--app-shell-left);
   right: auto;
   width: var(--app-shell-width);
-  pointer-events: auto;
+  pointer-events: none;
   background: rgba(7, 12, 24, 0.62);
   backdrop-filter: blur(1px);
 }

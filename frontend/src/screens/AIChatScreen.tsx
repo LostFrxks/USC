@@ -1,7 +1,8 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import TopHeader from "../ui/TopHeader";
+import { useCallback } from "react";
 import { streamAnalyticsAssistant, type AnalyticsAssistantResponse } from "../api/analytics";
-import { fetchAiChatSessions, type AiChatSessionDto } from "../api/aiChat";
+import { createAiChatSession, deleteAiChatSession, fetchAiChatSessions, renameAiChatSession, type AiChatSessionDto } from "../api/aiChat";
 import { AI_TEXT } from "../constants/aiTexts";
 import WhatIfStudio from "../ui/ai/WhatIfStudio";
 
@@ -118,6 +119,12 @@ function mapRemoteSession(remote: AiChatSessionDto): ChatSession {
   };
 }
 
+function mergeSessions(localSessions: ChatSession[], remoteSessions: ChatSession[]) {
+  const remoteIds = new Set(remoteSessions.map((session) => session.remoteId).filter((value): value is number => typeof value === "number"));
+  const localOnly = localSessions.filter((session) => session.remoteId == null || !remoteIds.has(session.remoteId));
+  return [...remoteSessions, ...localOnly].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_SESSIONS);
+}
+
 export default function AIChatScreen({
   active,
   cartCount,
@@ -198,10 +205,9 @@ export default function AIChatScreen({
     }
   }, [key, sessions]);
 
-  useEffect(() => {
-    if (!companyId) return;
-    let cancelled = false;
-    void (async () => {
+  const refreshRemoteSessions = useCallback(
+    async (preferredSessionId?: string | null) => {
+      if (!companyId) return;
       try {
         const remote = await fetchAiChatSessions({
           companyId,
@@ -209,19 +215,27 @@ export default function AIChatScreen({
           limit: MAX_SESSIONS,
           messageLimit: MAX_MESSAGES_PER_SESSION,
         });
-        if (cancelled) return;
-        const next = (remote.sessions || []).map(mapRemoteSession).slice(0, MAX_SESSIONS);
-        if (!next.length) return;
-        setSessions(next);
-        setCurrentId((curr) => (curr && next.some((s) => s.id === curr) ? curr : next[0]?.id ?? null));
+        const nextRemote = (remote.sessions || []).map(mapRemoteSession).slice(0, MAX_SESSIONS);
+        setSessions((prev) => {
+          const merged = mergeSessions(prev, nextRemote);
+          const desired = preferredSessionId ?? currentId;
+          setCurrentId((curr) => {
+            const target = desired ?? curr;
+            if (target && merged.some((session) => session.id === target)) return target;
+            return merged[0]?.id ?? null;
+          });
+          return merged;
+        });
       } catch {
         // keep local cache if remote is unavailable
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [analyticsRole, companyId]);
+    },
+    [analyticsRole, companyId, currentId]
+  );
+
+  useEffect(() => {
+    void refreshRemoteSessions();
+  }, [refreshRemoteSessions]);
 
   const currentSession = sessions.find((s) => s.id === currentId) ?? null;
 
@@ -389,6 +403,43 @@ export default function AIChatScreen({
     );
   };
 
+  const renameSession = async (session: ChatSession) => {
+    const nextTitle = window.prompt("Новое название чата", session.title)?.trim();
+    if (!nextTitle || nextTitle === session.title) return;
+
+    updateSession(session.id, (current) => ({
+      ...current,
+      title: nextTitle,
+      updatedAt: Date.now(),
+    }));
+
+    if (!session.remoteId) return;
+
+    try {
+      await renameAiChatSession(session.remoteId, nextTitle);
+      await refreshRemoteSessions(session.id);
+    } catch {
+      onNotify("Не удалось переименовать чат", "error");
+    }
+  };
+
+  const removeSession = async (session: ChatSession) => {
+    if (!window.confirm(`Удалить чат "${session.title}"?`)) return;
+
+    setSessions((prev) => prev.filter((item) => item.id !== session.id));
+    setCurrentId((curr) => (curr === session.id ? null : curr));
+    if (onboardingSessionIdRef.current === session.id) onboardingSessionIdRef.current = null;
+
+    if (!session.remoteId) return;
+
+    try {
+      await deleteAiChatSession(session.remoteId);
+      await refreshRemoteSessions();
+    } catch {
+      onNotify("Не удалось удалить чат", "error");
+    }
+  };
+
   const sendMessage = async (rawQuestion?: string) => {
     const question = (rawQuestion ?? input).trim();
     if (!question || !companyId || loading) return;
@@ -408,6 +459,36 @@ export default function AIChatScreen({
       setCurrentId(targetId);
     }
     let targetRemoteId = sessions.find((s) => s.id === targetId)?.remoteId;
+    if (!targetRemoteId) {
+      try {
+        const created = await createAiChatSession({
+          companyId,
+          role: analyticsRole,
+          title: question,
+        });
+        targetRemoteId = created.id;
+        const remoteSessionId = `srv-${created.id}`;
+        setSessions((prev) =>
+          prev.map((session) =>
+            session.id === targetId
+              ? {
+                  ...session,
+                  id: remoteSessionId,
+                  remoteId: created.id,
+                  title: created.title || session.title,
+                  createdAt: created.created_at ? new Date(created.created_at).getTime() : session.createdAt,
+                  updatedAt: created.updated_at ? new Date(created.updated_at).getTime() : session.updatedAt,
+                }
+              : session
+          )
+        );
+        if (onboardingSessionIdRef.current === targetId) onboardingSessionIdRef.current = remoteSessionId;
+        setCurrentId((curr) => (curr === targetId ? remoteSessionId : curr));
+        targetId = remoteSessionId;
+      } catch {
+        // fallback to lazy server-side creation inside analytics endpoint
+      }
+    }
 
     const userMsg: ChatMessage = {
       id: makeId("u"),
@@ -499,6 +580,9 @@ export default function AIChatScreen({
         if (onboardingSessionIdRef.current === targetId) onboardingSessionIdRef.current = newSessionId;
         setCurrentId((curr) => (curr === targetId ? newSessionId : curr));
         targetRemoteId = res.chat_session_id;
+        await refreshRemoteSessions(newSessionId);
+      } else {
+        await refreshRemoteSessions(targetId);
       }
     } catch {
       updateSession(targetId, (s) => ({
@@ -569,18 +653,41 @@ export default function AIChatScreen({
             <div className="ai-sessions">
               {sessions.length ? (
                 sessions.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    className={`ai-session-item ${s.id === currentId ? "active" : ""}`}
-                    onClick={() => {
-                      setCurrentId(s.id);
-                      setMobileSidebarOpen(false);
-                    }}
-                  >
-                    <div className="ai-session-title">{s.title}</div>
-                    <div className="ai-session-meta">{new Date(s.updatedAt).toLocaleString("ru-RU")}</div>
-                  </button>
+                  <div key={s.id} className={`ai-session-item ${s.id === currentId ? "active" : ""}`}>
+                    <button
+                      type="button"
+                      className="ai-session-main"
+                      onClick={() => {
+                        setCurrentId(s.id);
+                        setMobileSidebarOpen(false);
+                      }}
+                    >
+                      <div className="ai-session-title-row">
+                        <div className="ai-session-title">{s.title}</div>
+                        {typeof s.messageCount === "number" ? <div className="ai-session-count">{s.messageCount}</div> : null}
+                      </div>
+                      {s.preview ? <div className="ai-session-preview">{s.preview}</div> : null}
+                      <div className="ai-session-meta">{new Date(s.updatedAt).toLocaleString("ru-RU")}</div>
+                    </button>
+                    <div className="ai-session-actions">
+                      <button
+                        type="button"
+                        className="ai-session-action"
+                        aria-label="Переименовать чат"
+                        onClick={() => void renameSession(s)}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        className="ai-session-action ai-session-action--danger"
+                        aria-label="Удалить чат"
+                        onClick={() => void removeSession(s)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
                 ))
               ) : (
                 <div className="ai-session-empty">Пока нет диалогов</div>

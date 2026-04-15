@@ -35,6 +35,14 @@ export function appendGeoTag(comment: string, coords: LatLng | null | undefined)
   return base ? `${base}\n${tag}` : tag;
 }
 
+export function stripGeoTag(comment: string | null | undefined): string {
+  return String(comment || "")
+    .replace(GEO_TAG_REGEX, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function parseGeoTag(comment: string | null | undefined): LatLng | null {
   if (!comment) return null;
   const match = comment.match(GEO_TAG_CAPTURE_REGEX);

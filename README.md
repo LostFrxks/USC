@@ -10,7 +10,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 
 Open:
 - Frontend: http://localhost:5173
-- Backend API: http://localhost:8000/api/health
+- Backend API: http://localhost:8001/api/health
 - Frontend from another device in same network: `http://<YOUR_LAN_IP>:5173`
 
 Find your LAN IPv4 on Windows:
@@ -46,6 +46,8 @@ Fill real values in `.env`:
 - `JWT_SECRET_KEY`
 - `CORS_ALLOW_ORIGINS` with your Netlify URL
 - `CORS_ALLOW_ORIGIN_REGEX` with your Netlify site pattern
+- `APP_ENV=prod`
+- production-safe auth settings: `CAPTCHA_PROVIDER`, `AUTH_COOKIE_SECURE`, `AUTH_COOKIE_SAMESITE`
 
 Start only backend dependencies + API:
 
@@ -137,6 +139,22 @@ Recommended minimum:
 - length: 32+ characters
 - high entropy random string (letters + numbers + symbols)
 - never commit to git
+
+## Auth cookie setup
+
+Refresh tokens are now expected to rotate through an `HttpOnly` cookie.
+
+Important backend env values:
+- `AUTH_REFRESH_COOKIE_NAME`
+- `AUTH_COOKIE_PATH`
+- `AUTH_COOKIE_DOMAIN`
+- `AUTH_COOKIE_SAMESITE`
+- `AUTH_COOKIE_SECURE`
+
+Recommended defaults:
+- local dev with Vite proxy: `AUTH_COOKIE_SAMESITE=lax`, `AUTH_COOKIE_SECURE=false`
+- HTTPS public deployment: `AUTH_COOKIE_SECURE=true`
+- cross-origin frontend/backend over HTTPS: `AUTH_COOKIE_SAMESITE=none` and `AUTH_COOKIE_SECURE=true`
 
 ## MVP map setup (free, no API key)
 

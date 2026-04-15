@@ -3,7 +3,7 @@ import { createOrder } from "../api/orders";
 import type { ToastTone } from "../hooks/useToast";
 import type { CartItem } from "../types";
 import TopHeader from "../ui/TopHeader";
-import { appendGeoTag, validateLatLngInputs, type LatLng } from "../utils/geo";
+import { validateLatLngInputs, type LatLng } from "../utils/geo";
 import { logger } from "../utils/logger";
 
 type DeliveryMode = "YANDEX" | "SUPPLIER_COURIER" | "BUYER_COURIER";
@@ -70,7 +70,7 @@ export default function CartScreen({
     []
   );
   const hasOnboardingDemo = onboardingDemoMode && items.length === 0;
-  const visibleItems = hasOnboardingDemo ? [demoItem] : items;
+  const visibleItems = useMemo(() => (hasOnboardingDemo ? [demoItem] : items), [demoItem, hasOnboardingDemo, items]);
   const visibleTotal = hasOnboardingDemo ? demoItem.product.price * demoItem.qty : total;
   const itemsCount = useMemo(() => visibleItems.reduce((acc, it) => acc + it.qty, 0), [visibleItems]);
   const canCheckout = !creating && itemsCount > 0 && Boolean(buyerCompanyId);
@@ -128,13 +128,13 @@ export default function CartScreen({
       return;
     }
 
-    const finalComment = appendGeoTag(comment, coords);
-
     try {
       setCreating(true);
       await createOrder({
         delivery_address: address.trim(),
-        comment: finalComment,
+        delivery_lat: coords?.lat ?? null,
+        delivery_lng: coords?.lng ?? null,
+        comment: comment.trim(),
         buyer_company_id: Number(buyerCompanyId),
         supplier_company_id: supplierIds[0],
         delivery_mode: deliveryMode,
@@ -418,5 +418,3 @@ export default function CartScreen({
     </section>
   );
 }
-
-

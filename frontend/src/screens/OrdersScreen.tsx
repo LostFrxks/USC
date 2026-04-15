@@ -11,7 +11,7 @@ import type { ToastTone } from "../hooks/useToast";
 import { useOrders } from "../hooks/useOrders";
 import OrderModal from "../ui/OrderModal";
 import SecondaryTopbar from "../ui/SecondaryTopbar";
-import { parseGeoTag, toOsmLink } from "../utils/geo";
+import { parseGeoTag, stripGeoTag, toOsmLink } from "../utils/geo";
 
 const JOURNEY_STEPS = ["Создан", "Подтвержден", "В пути", "Доставлен"] as const;
 type OrderFilter = "all" | "active" | "delivered" | "cancelled";
@@ -410,7 +410,12 @@ export default function OrdersScreen({
       cancelled: cancelledCount,
     };
   }, [orderedList]);
-  const selectedGeo = selected ? parseGeoTag(selected.comment) : null;
+  const selectedGeo =
+    selected?.deliveryLat != null && selected?.deliveryLng != null
+      ? { lat: selected.deliveryLat, lng: selected.deliveryLng }
+      : selected
+        ? parseGeoTag(selected.comment)
+        : null;
 
   return (
     <section id="screen-orders" data-testid="screen-orders" className={`screen ${active ? "active" : ""}`}>
@@ -506,10 +511,13 @@ export default function OrdersScreen({
             const canQuickRepeat = roleLower !== "supplier" && mode === "buyer" && !isCancelledStatus(o.status);
             const itemsLabel =
               typeof o.itemsCount === "number" ? `Позиций: ${o.itemsCount}` : "Поставка USC";
-            const metaParts = [date, o.comment].filter(Boolean);
+            const metaParts = [date, stripGeoTag(o.comment)].filter(Boolean);
             const meta = metaParts.join(" · ");
             const hint = nextStepHint(o, roleLower);
-            const geo = parseGeoTag(o.comment);
+            const geo =
+              o.deliveryLat != null && o.deliveryLng != null
+                ? { lat: o.deliveryLat, lng: o.deliveryLng }
+                : parseGeoTag(o.comment);
 
             return (
               <div

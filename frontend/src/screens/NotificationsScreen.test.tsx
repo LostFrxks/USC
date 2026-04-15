@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { setAccessToken } from "../api/client";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import NotificationsScreen from "./NotificationsScreen";
 
@@ -19,7 +20,7 @@ vi.mock("../api/notifications", () => ({
 describe("NotificationsScreen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.setItem("usc_access_token", "token");
+    setAccessToken("token");
   });
 
   it("renders notifications list and unread counter", async () => {
@@ -83,4 +84,3 @@ describe("NotificationsScreen", () => {
     });
   });
 });
-

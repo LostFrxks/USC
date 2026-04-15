@@ -92,6 +92,34 @@ def _can_be_assigned_courier(db: Session, courier_id: int, order_row: dict) -> b
     ) is not None
 
 
+def _assignable_couriers_for_order(db: Session, order_row: dict) -> list[dict]:
+    company_ids = [int(order_row.get("buyer_company_id")), int(order_row.get("supplier_company_id"))]
+    rows = db.execute(
+        select(users, company_members.c.company_id)
+        .select_from(company_members.join(users, company_members.c.user_id == users.c.id))
+        .where(
+            company_members.c.company_id.in_(company_ids),
+            users.c.is_courier_enabled == True,  # noqa: E712
+        )
+        .order_by(users.c.id.asc())
+    ).mappings().all()
+
+    out: dict[int, dict] = {}
+    for row in rows:
+        user_id = int(row["id"])
+        if user_id not in out:
+            out[user_id] = {
+                "id": user_id,
+                "email": row.get("email") or "",
+                "first_name": row.get("first_name") or "",
+                "last_name": row.get("last_name") or "",
+                "phone": row.get("phone") or "",
+                "company_ids": [],
+            }
+        out[user_id]["company_ids"].append(int(row["company_id"]))
+    return list(out.values())
+
+
 def _invalidate_delivery_related_cache() -> None:
     invalidate_patterns("v1:deliveries:*", "v1:orders:*", "v1:notifications:*", "v1:analytics:*")
 
@@ -213,6 +241,24 @@ def get_delivery_by_order(order_id: int, user: dict = Depends(get_current_user),
     row = db.execute(select(deliveries).where(deliveries.c.order_id == order_id)).mappings().first()
     response = dict(row) if row else None
     set_json(cache_key, response if response is not None else {"__empty__": True}, settings.CACHE_TTL_DELIVERIES)
+    return response
+
+
+@router.get("/deliveries/couriers/by_order/{order_id}/")
+def get_assignable_couriers(order_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    order_row = db.execute(select(orders).where(orders.c.id == order_id)).mappings().first()
+    if not order_row:
+        raise HTTPException(404, detail="order not found")
+    if not _is_supplier_delivery_manager(db, int(user["id"]), dict(order_row)):
+        raise HTTPException(403, detail="Only supplier delivery managers can view assignable couriers")
+
+    cache_key = make_key("deliveries", "couriers_by_order", int(user["id"]), order_id)
+    cached = get_json(cache_key)
+    if isinstance(cached, list):
+        return cached
+
+    response = _assignable_couriers_for_order(db, dict(order_row))
+    set_json(cache_key, response, settings.CACHE_TTL_DELIVERIES)
     return response
 
 

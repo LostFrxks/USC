@@ -2,10 +2,8 @@
 
 import asyncio
 from datetime import date, datetime, timedelta, timezone
-import httpx
 import json
 import re
-import threading
 from typing import AsyncIterator, Optional
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
@@ -16,7 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
-from app.cache.redis_cache import get_json, make_key, set_json, stable_hash
+from app.cache.redis_cache import get_json, make_key, set_json
 from app.core.config import settings
 from app.deps.auth import get_current_user
 from app.db.deps import get_db
@@ -35,6 +33,28 @@ from app.services.ai_chat import (
     list_chat_sessions,
     rename_chat_session,
 )
+from app.services.analytics_assistant import (
+    assistant_answer,
+    build_actor_context,
+    llm_assistant_answer,
+    llm_policy_check,
+    looks_abusive_minimal,
+    looks_analytics_question,
+    policy_block_response,
+    safe_float,
+    sanitize_assistant_line,
+    sanitize_assistant_payload,
+)
+from app.services.analytics_cache import (
+    analytics_assistant_cache_key,
+    analytics_summary_cache_key,
+    analytics_what_if_list_cache_key,
+    analytics_what_if_simulate_cache_key,
+    get_cached_insights,
+    set_cached_insights,
+)
+from app.services.analytics_insights import build_insights, contains_cyrillic, llm_generate_insights
+from app.services.analytics_stream import llm_stream_text, ndjson_event, stream_text_chunks
 from app.services.what_if import (
     create_what_if_scenario,
     delete_what_if_scenario,
@@ -47,10 +67,6 @@ from app.services.what_if import (
 )
 
 router = APIRouter(tags=["analytics"])
-
-_INSIGHTS_CACHE_TTL_SECONDS = 600
-_INSIGHTS_CACHE_LOCK = threading.Lock()
-_INSIGHTS_CACHE: dict[tuple[int, str, int], tuple[datetime, list[str]]] = {}
 
 
 class AnalyticsAssistantRequest(BaseModel):
@@ -556,7 +572,7 @@ def _llm_assistant_answer(
         "role": summary.get("role"),
         "days": summary.get("days"),
         "total_orders": int(summary.get("total_orders") or 0),
-        "total_revenue": _safe_float(summary.get("total_revenue")),
+        "total_revenue": safe_float(summary.get("total_revenue")),
         "market": summary.get("market") or {},
         "sales_trends": (summary.get("sales_trends") or [])[-12:],
         "market_trends": (summary.get("market_trends") or [])[-12:],
@@ -1831,7 +1847,7 @@ def analytics_summary(
     if role_norm not in {"supplier", "buyer"}:
         role_norm = "supplier"
 
-    summary_cache_key = _analytics_summary_cache_key(
+    summary_cache_key = analytics_summary_cache_key(
         user_id=u_id,
         company_id=company_id,
         role=role_norm,
@@ -1985,12 +2001,12 @@ def analytics_summary(
     ]
 
     status_funnel = [{"status": str(r.status), "count": int(r.count or 0)} for r in status_rows]
-    base_insights = _build_insights(sales_trends=sales_trends, category_breakdown=category_breakdown, status_funnel=status_funnel)
+    base_insights = build_insights(sales_trends=sales_trends, category_breakdown=category_breakdown, status_funnel=status_funnel)
 
     market_revenue_f = float(market_revenue or 0)
     total_revenue_f = float(total_revenue or 0)
     company_share_pct = round((total_revenue_f / market_revenue_f) * 100, 2) if market_revenue_f > 0 else 0
-    insights = _get_cached_insights(company_id=company_id, role=role_norm, days=days) or base_insights
+    insights = get_cached_insights(company_id=company_id, role=role_norm, days=days) or base_insights
     buyer_recommendations = (
         _build_buyer_recommendations(db, company_id=company_id, since_dt=since_dt)
         if role_norm == "buyer"
@@ -2009,7 +2025,7 @@ def analytics_summary(
         buyer_recommendations=buyer_recommendations,
     )
     if insights is base_insights and settings.OPENAI_API_KEY:
-        llm_insights = _llm_generate_insights(
+        llm_insights = llm_generate_insights(
             {
                 "company_id": company_id,
                 "role": role_norm,
@@ -2031,7 +2047,7 @@ def analytics_summary(
         )
         if llm_insights:
             insights = llm_insights[:3]
-            _set_cached_insights(company_id=company_id, role=role_norm, days=days, insights=insights)
+            set_cached_insights(company_id=company_id, role=role_norm, days=days, insights=insights)
 
     response = {
         "company_id": company_id,
@@ -2075,7 +2091,7 @@ def analytics_what_if(
     drilldown_by = "sku" if str(payload.drilldown_by or "").strip().lower() == "sku" else "category"
     selected_month = (payload.selected_month or "").strip() or None
 
-    cache_key = _analytics_what_if_simulate_cache_key(
+    cache_key = analytics_what_if_simulate_cache_key(
         user_id=u_id,
         company_id=int(payload.company_id),
         role=role_norm,
@@ -2121,7 +2137,7 @@ def analytics_what_if_scenarios(
     if int(company_id) not in _company_ids_for_user(db, u_id):
         raise HTTPException(403, detail="Not allowed")
 
-    cache_key = _analytics_what_if_list_cache_key(
+    cache_key = analytics_what_if_list_cache_key(
         user_id=u_id,
         company_id=int(company_id),
         role=role_norm,
@@ -2371,7 +2387,7 @@ def analytics_assistant_query(
         db.commit()
         return blocked
 
-    assistant_cache_key = _analytics_assistant_cache_key(
+    assistant_cache_key = analytics_assistant_cache_key(
         user_id=u_id,
         company_id=payload.company_id,
         role=role_norm,
@@ -2393,7 +2409,7 @@ def analytics_assistant_query(
         db.commit()
         return out_cached
 
-    actor_context = _build_actor_context(
+    actor_context = build_actor_context(
         db=db,
         user=user,
         company_id=payload.company_id,
@@ -2407,7 +2423,7 @@ def analytics_assistant_query(
         user=user,
         db=db,
     )
-    llm = _llm_assistant_answer(
+    llm = llm_assistant_answer(
         summary=summary,
         question=payload.question,
         selected_month=payload.selected_month,
@@ -2415,9 +2431,9 @@ def analytics_assistant_query(
     )
     if llm is not None:
         # Guarantee practical recommendations for analytics questions.
-        if _looks_analytics_question(payload.question):
+        if looks_analytics_question(payload.question):
             if not llm.get("probable_causes") or not llm.get("actions"):
-                fallback = _assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
+                fallback = assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
                 if not llm.get("probable_causes"):
                     llm["probable_causes"] = fallback.get("probable_causes", [])
                 if not llm.get("actions"):
@@ -2425,7 +2441,7 @@ def analytics_assistant_query(
                 if not llm.get("summary"):
                     llm["summary"] = fallback.get("summary", "")
                 llm["show_metrics"] = bool(llm.get("show_metrics", True))
-        llm = _sanitize_assistant_payload(llm)
+        llm = sanitize_assistant_payload(llm)
         set_json(assistant_cache_key, llm, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
         llm["chat_session_id"] = chat_session_id
         _persist_chat_turn(
@@ -2437,8 +2453,8 @@ def analytics_assistant_query(
         )
         db.commit()
         return llm
-    fallback = _assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
-    fallback = _sanitize_assistant_payload(fallback)
+    fallback = assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
+    fallback = sanitize_assistant_payload(fallback)
     set_json(assistant_cache_key, fallback, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
     fallback["chat_session_id"] = chat_session_id
     _persist_chat_turn(
@@ -2473,7 +2489,7 @@ async def analytics_assistant_query_stream(
         chat_session_id=payload.chat_session_id,
     )
 
-    assistant_cache_key = _analytics_assistant_cache_key(
+    assistant_cache_key = analytics_assistant_cache_key(
         user_id=u_id,
         company_id=payload.company_id,
         role=role_norm,
@@ -2484,7 +2500,7 @@ async def analytics_assistant_query_stream(
     cached_answer = get_json(assistant_cache_key)
 
     async def stream_from_cached(answer: dict) -> AsyncIterator[str]:
-        out_cached = _sanitize_assistant_payload(dict(answer))
+        out_cached = sanitize_assistant_payload(dict(answer))
         out_cached["chat_session_id"] = chat_session_id
         _persist_chat_turn(
             db=db,
@@ -2494,11 +2510,11 @@ async def analytics_assistant_query_stream(
             answer=out_cached,
         )
         db.commit()
-        yield _ndjson_event({"type": "start"})
-        for chunk in _stream_text_chunks(str(out_cached.get("summary") or ""), chunk_size=14):
-            yield _ndjson_event({"type": "delta", "text": chunk})
+        yield ndjson_event({"type": "start"})
+        for chunk in stream_text_chunks(str(out_cached.get("summary") or ""), chunk_size=14):
+            yield ndjson_event({"type": "delta", "text": chunk})
             await asyncio.sleep(0.02)
-        yield _ndjson_event({"type": "done", "data": out_cached})
+        yield ndjson_event({"type": "done", "data": out_cached})
 
     if isinstance(cached_answer, dict):
         return StreamingResponse(
@@ -2523,8 +2539,8 @@ async def analytics_assistant_query_stream(
     )
 
     async def stream_new_answer() -> AsyncIterator[str]:
-        if _looks_abusive_minimal(payload.question):
-            blocked = _policy_block_response()
+        if looks_abusive_minimal(payload.question):
+            blocked = policy_block_response()
             blocked["chat_session_id"] = chat_session_id
             _persist_chat_turn(
                 db=db,
@@ -2534,35 +2550,36 @@ async def analytics_assistant_query_stream(
                 answer=blocked,
             )
             db.commit()
-            yield _ndjson_event({"type": "start"})
-            for chunk in _stream_text_chunks(str(blocked.get("summary") or ""), chunk_size=14):
-                yield _ndjson_event({"type": "delta", "text": chunk})
+            yield ndjson_event({"type": "start"})
+            for chunk in stream_text_chunks(str(blocked.get("summary") or ""), chunk_size=14):
+                yield ndjson_event({"type": "delta", "text": chunk})
                 await asyncio.sleep(0.02)
-            yield _ndjson_event({"type": "done", "data": blocked})
+            yield ndjson_event({"type": "done", "data": blocked})
             return
 
         yielded_any = False
         streamed_text = ""
-        yield _ndjson_event({"type": "start"})
+        yield ndjson_event({"type": "start"})
         if settings.OPENAI_API_KEY:
             try:
-                async for piece in _llm_stream_text(
+                async for piece in llm_stream_text(
                     summary=summary,
                     question=payload.question,
                     selected_month=payload.selected_month,
                     actor_context=actor_context,
+                    safe_float=_safe_float,
                 ):
                     yielded_any = True
                     streamed_text += piece
-                    yield _ndjson_event({"type": "delta", "text": piece})
+                    yield ndjson_event({"type": "delta", "text": piece})
             except Exception:
                 yielded_any = False
                 streamed_text = ""
 
         if yielded_any and streamed_text.strip():
-            out = _assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
-            out["summary"] = _sanitize_assistant_line(streamed_text.strip())
-            out = _sanitize_assistant_payload(out)
+            out = assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
+            out["summary"] = sanitize_assistant_line(streamed_text.strip())
+            out = sanitize_assistant_payload(out)
             out["chat_session_id"] = chat_session_id
             set_json(assistant_cache_key, out, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
             _persist_chat_turn(
@@ -2573,11 +2590,11 @@ async def analytics_assistant_query_stream(
                 answer=out,
             )
             db.commit()
-            yield _ndjson_event({"type": "done", "data": out})
+            yield ndjson_event({"type": "done", "data": out})
             return
 
-        fallback = _assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
-        fallback = _sanitize_assistant_payload(fallback)
+        fallback = assistant_answer(summary=summary, question=payload.question, selected_month=payload.selected_month)
+        fallback = sanitize_assistant_payload(fallback)
         fallback["chat_session_id"] = chat_session_id
         set_json(assistant_cache_key, fallback, settings.CACHE_TTL_ANALYTICS_ASSISTANT)
         _persist_chat_turn(
@@ -2588,10 +2605,10 @@ async def analytics_assistant_query_stream(
             answer=fallback,
         )
         db.commit()
-        for chunk in _stream_text_chunks(str(fallback.get("summary") or ""), chunk_size=14):
-            yield _ndjson_event({"type": "delta", "text": chunk})
+        for chunk in stream_text_chunks(str(fallback.get("summary") or ""), chunk_size=14):
+            yield ndjson_event({"type": "delta", "text": chunk})
             await asyncio.sleep(0.02)
-        yield _ndjson_event({"type": "done", "data": fallback})
+        yield ndjson_event({"type": "done", "data": fallback})
 
     return StreamingResponse(
         stream_new_answer(),

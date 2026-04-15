@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import insert, select, update
 from sqlalchemy.orm import Session
@@ -20,12 +20,13 @@ from app.observability import observe_db_query_failure, observe_login_attempt
 from app.security.auth_guard import AuthGuardError, auth_guard
 from app.security.rate_limit import RateLimitError, RateLimitRule, rate_limit
 from app.security.refresh_sessions import (
-    create_refresh_session,
     get_refresh_session,
     revoke_all_refresh_sessions_for_user,
     revoke_refresh_session,
 )
 from app.services.audit import log_audit_event
+from app.services.auth_cookies import clear_refresh_cookie, extract_refresh_token, set_refresh_cookie
+from app.services.auth_tokens import issue_token_pair
 from app.utils.auth import create_access_token, create_refresh_token, decode_token, make_legacy_password, refresh_expires_at, verify_legacy_password
 from app.utils.emailer import can_send, send_email
 
@@ -44,7 +45,7 @@ class TokenPair(BaseModel):
 
 
 class RefreshPayload(BaseModel):
-    refresh: str
+    refresh: str | None = None
 
 
 class RegisterPayload(BaseModel):
@@ -101,7 +102,18 @@ class EmailVerifyPayload(BaseModel):
 
 
 class LogoutPayload(BaseModel):
-    refresh: str
+    refresh: str | None = None
+
+
+class PasswordResetRequestPayload(BaseModel):
+    email: str
+
+
+class PasswordResetConfirmPayload(BaseModel):
+    email: str
+    code: str
+    new_password: str
+    captcha_token: Optional[str] = None
 
 
 def _col(name: str):
@@ -219,7 +231,7 @@ def _set_verification_code(channel: str, target: str, code: str, expires_at: dat
     if channel == "phone":
         PHONE_CODES[target] = (code, expires_at)
     else:
-        EMAIL_CODES[target] = (code, expires_at)
+        EMAIL_CODES[f"{channel}:{target}"] = (code, expires_at)
 
 
 def _get_verification_code(channel: str, target: str) -> tuple[str, datetime] | None:
@@ -238,7 +250,7 @@ def _get_verification_code(channel: str, target: str) -> tuple[str, datetime] | 
 
     if channel == "phone":
         return PHONE_CODES.get(target)
-    return EMAIL_CODES.get(target)
+    return EMAIL_CODES.get(f"{channel}:{target}")
 
 
 def _clear_verification_code(channel: str, target: str) -> None:
@@ -246,7 +258,7 @@ def _clear_verification_code(channel: str, target: str) -> None:
     if channel == "phone":
         PHONE_CODES.pop(target, None)
     else:
-        EMAIL_CODES.pop(target, None)
+        EMAIL_CODES.pop(f"{channel}:{target}", None)
 
 
 def _client_ip(request: Request) -> str:
@@ -320,46 +332,8 @@ def _raise_after_failure(*, scope: str, target: str, ip: str, status_code: int, 
     raise HTTPException(status_code=status_code, detail=detail)
 
 
-def _issue_token_pair(
-    db: Session,
-    *,
-    user_id: int,
-    email: str,
-    role: str | None = None,
-    ip: str | None = None,
-    user_agent: str | None = None,
-    sid: str | None = None,
-) -> TokenPair:
-    subject = str(user_id)
-    extra = {"email": email}
-    if role:
-        extra["role"] = role
-    if sid:
-        extra["sid"] = sid
-
-    access = create_access_token(subject=subject, extra=extra)
-    refresh = create_refresh_token(subject=subject, extra=extra)
-    refresh_data = decode_token(refresh)
-    jti = str(refresh_data.get("jti") or "")
-    refresh_sid = str(refresh_data.get("sid") or sid or "")
-    if not jti or not refresh_sid:
-        raise HTTPException(500, detail="Failed to generate refresh session claims")
-
-    create_refresh_session(
-        db,
-        user_id=user_id,
-        jti=jti,
-        sid=refresh_sid,
-        expires_at=refresh_expires_at(),
-        ip=ip,
-        user_agent=(user_agent or "")[:255],
-        metadata={"issued_via": "auth_router"},
-    )
-    return TokenPair(access=access, refresh=refresh)
-
-
 @router.post("/login/", response_model=TokenPair)
-def login(payload: LoginPayload, request: Request, db: Session = Depends(get_db)):
+def login(payload: LoginPayload, request: Request, response: Response, db: Session = Depends(get_db)):
     email = payload.email.strip().lower()
     if not _is_valid_email(email):
         raise HTTPException(400, detail="Invalid email")
@@ -414,7 +388,7 @@ def login(payload: LoginPayload, request: Request, db: Session = Depends(get_db)
     role = _get_role_from_row(u) or None
     _auth_guard_success(scope="login", target=email, ip=ip)
     observe_login_attempt(result="success")
-    pair = _issue_token_pair(
+    pair_data = issue_token_pair(
         db,
         user_id=int(u.get("id")),
         email=str(u.get("email") or email),
@@ -435,25 +409,29 @@ def login(payload: LoginPayload, request: Request, db: Session = Depends(get_db)
         outcome="success",
     )
     db.commit()
-    return pair
+    set_refresh_cookie(response, pair_data["refresh"])
+    return TokenPair(**pair_data)
 
 
 # SimpleJWT-ish aliases (JSON body; not form-encoded)
 @router.post("/token/", response_model=TokenPair)
-def token(payload: LoginPayload, request: Request, db: Session = Depends(get_db)):
-    return login(payload, request, db)
+def token(payload: LoginPayload, request: Request, response: Response, db: Session = Depends(get_db)):
+    return login(payload, request, response, db)
 
 
 @router.post("/token/refresh/", response_model=TokenPair)
-def token_refresh(payload: RefreshPayload, request: Request, db: Session = Depends(get_db)):
+def token_refresh(payload: RefreshPayload, request: Request, response: Response, db: Session = Depends(get_db)):
     ip = _client_ip(request)
     _apply_rate_limit(
         "auth_token_refresh",
         identity=ip,
         rules=[RateLimitRule(limit=20, window_seconds=600, key_suffix=f"ip:{ip}")],
     )
+    refresh_token = extract_refresh_token(request, payload.refresh)
+    if not refresh_token:
+        raise HTTPException(401, detail="Invalid refresh token")
     try:
-        data = decode_token(payload.refresh)
+        data = decode_token(refresh_token)
     except Exception:
         log_audit_event(
             db,
@@ -502,7 +480,7 @@ def token_refresh(payload: RefreshPayload, request: Request, db: Session = Depen
         raise HTTPException(401, detail="Refresh token expired")
 
     role = str(data.get("role") or "") or None
-    pair = _issue_token_pair(
+    pair_data = issue_token_pair(
         db,
         user_id=int(subject),
         email=str(data.get("email") or ""),
@@ -511,7 +489,7 @@ def token_refresh(payload: RefreshPayload, request: Request, db: Session = Depen
         user_agent=request.headers.get("user-agent"),
         sid=sid,
     )
-    new_jti = str(decode_token(pair.refresh).get("jti") or "")
+    new_jti = str(decode_token(pair_data["refresh"]).get("jti") or "")
     revoke_refresh_session(db, jti=jti, replaced_by_jti=(new_jti or None))
     log_audit_event(
         db,
@@ -527,7 +505,8 @@ def token_refresh(payload: RefreshPayload, request: Request, db: Session = Depen
         payload={"replaced_by_jti": new_jti},
     )
     db.commit()
-    return pair
+    set_refresh_cookie(response, pair_data["refresh"])
+    return TokenPair(**pair_data)
 
 
 @router.post("/register/", response_model=RegisterResponse)
@@ -662,7 +641,7 @@ def phone_request(payload: PhoneRequestPayload, request: Request):
 
 
 @router.post("/phone/verify/", response_model=TokenPair)
-def phone_verify(payload: PhoneVerifyPayload, request: Request, db: Session = Depends(get_db)):
+def phone_verify(payload: PhoneVerifyPayload, request: Request, response: Response, db: Session = Depends(get_db)):
     phone = _normalize_phone(payload.phone)
     if not phone or len(phone) < 6:
         raise HTTPException(400, detail="Invalid phone")
@@ -771,7 +750,7 @@ def phone_verify(payload: PhoneVerifyPayload, request: Request, db: Session = De
     role = _get_role_from_row(u) or payload.role
     _clear_verification_code("phone", phone)
     _auth_guard_success(scope="phone_verify", target=phone, ip=ip)
-    pair = _issue_token_pair(
+    pair_data = issue_token_pair(
         db,
         user_id=int(u.get("id")),
         email=str(u.get("email") or ""),
@@ -793,7 +772,8 @@ def phone_verify(payload: PhoneVerifyPayload, request: Request, db: Session = De
         payload={"phone": phone},
     )
     db.commit()
-    return pair
+    set_refresh_cookie(response, pair_data["refresh"])
+    return TokenPair(**pair_data)
 
 
 @router.post("/email/request/", response_model=PhoneRequestResponse)
@@ -832,7 +812,7 @@ def email_request(payload: EmailRequestPayload, request: Request):
 
 
 @router.post("/email/verify/", response_model=TokenPair)
-def email_verify(payload: EmailVerifyPayload, request: Request, db: Session = Depends(get_db)):
+def email_verify(payload: EmailVerifyPayload, request: Request, response: Response, db: Session = Depends(get_db)):
     email = payload.email.strip().lower()
     if not _is_valid_email(email):
         raise HTTPException(400, detail="Invalid email")
@@ -934,7 +914,7 @@ def email_verify(payload: EmailVerifyPayload, request: Request, db: Session = De
     role = _get_role_from_row(u) or payload.role
     _clear_verification_code("email", email)
     _auth_guard_success(scope="email_verify", target=email, ip=ip)
-    pair = _issue_token_pair(
+    pair_data = issue_token_pair(
         db,
         user_id=int(u.get("id")),
         email=str(u.get("email") or email),
@@ -956,13 +936,117 @@ def email_verify(payload: EmailVerifyPayload, request: Request, db: Session = De
         payload={"email": email},
     )
     db.commit()
-    return pair
+    set_refresh_cookie(response, pair_data["refresh"])
+    return TokenPair(**pair_data)
+
+
+@router.post("/password_reset/request/", response_model=PhoneRequestResponse)
+def password_reset_request(payload: PasswordResetRequestPayload, request: Request, db: Session = Depends(get_db)):
+    email = payload.email.strip().lower()
+    if not _is_valid_email(email):
+        raise HTTPException(400, detail="Invalid email")
+    ip = _client_ip(request)
+    _apply_rate_limit(
+        "auth_password_reset_request",
+        identity=f"{ip}|{email}",
+        rules=[
+            RateLimitRule(limit=3, window_seconds=600, key_suffix=f"email:{email}"),
+            RateLimitRule(limit=10, window_seconds=3600, key_suffix=f"ip:{ip}"),
+        ],
+    )
+
+    user_row = db.execute(select(users).where(_col("email") == email)).mappings().first()
+    if not user_row:
+        raise HTTPException(404, detail="User not found")
+
+    code = _generate_code()
+    expires_at = _code_expires_at()
+    _set_verification_code("password_reset", email, code, expires_at)
+    expires_in = max(60, int(settings.EMAIL_CODE_EXPIRES_SECONDS or 300))
+
+    if can_send():
+        try:
+            send_email(
+                email,
+                subject="USC password reset code",
+                text=f"Your USC password reset code: {code}\nValid for {expires_in // 60} minutes.",
+            )
+            return PhoneRequestResponse(sent=True, code=None, expires_in=expires_in)
+        except Exception:
+            raise HTTPException(502, detail="Failed to send password reset code")
+
+    if settings.EMAIL_CODE_DEV_FALLBACK:
+        return PhoneRequestResponse(sent=True, code=code, expires_in=expires_in)
+    raise HTTPException(503, detail="Email provider is not configured")
+
+
+@router.post("/password_reset/confirm/")
+def password_reset_confirm(payload: PasswordResetConfirmPayload, request: Request, db: Session = Depends(get_db)):
+    email = payload.email.strip().lower()
+    if not _is_valid_email(email):
+        raise HTTPException(400, detail="Invalid email")
+    if not payload.code or len(payload.code) < 4:
+        raise HTTPException(400, detail="Invalid code")
+    if not payload.new_password or len(payload.new_password) < 6:
+        raise HTTPException(400, detail="Password too short")
+
+    ip = _client_ip(request)
+    _apply_rate_limit(
+        "auth_password_reset_confirm",
+        identity=f"{ip}|{email}",
+        rules=[
+            RateLimitRule(limit=8, window_seconds=600, key_suffix=f"email:{email}"),
+            RateLimitRule(limit=20, window_seconds=3600, key_suffix=f"ip:{ip}"),
+        ],
+    )
+    _auth_guard_precheck(scope="password_reset_confirm", target=email, ip=ip, captcha_token=payload.captcha_token)
+
+    entry = _get_verification_code("password_reset", email)
+    if not entry:
+        _raise_after_failure(scope="password_reset_confirm", target=email, ip=ip, status_code=400, detail="Code not requested")
+    code, exp = entry
+    if datetime.now(timezone.utc) > exp:
+        _clear_verification_code("password_reset", email)
+        _raise_after_failure(scope="password_reset_confirm", target=email, ip=ip, status_code=400, detail="Code expired")
+    if payload.code != code:
+        _raise_after_failure(scope="password_reset_confirm", target=email, ip=ip, status_code=400, detail="Invalid code")
+
+    user_row = db.execute(select(users).where(_col("email") == email)).mappings().first()
+    if not user_row:
+        raise HTTPException(404, detail="User not found")
+
+    db.execute(
+        update(users)
+        .where(_col("id") == int(user_row.get("id")))
+        .values({"password": make_legacy_password(payload.new_password)})
+    )
+    revoked = revoke_all_refresh_sessions_for_user(db, user_id=int(user_row.get("id")))
+    _clear_verification_code("password_reset", email)
+    _auth_guard_success(scope="password_reset_confirm", target=email, ip=ip)
+    log_audit_event(
+        db,
+        domain="auth",
+        action="password_reset",
+        resource_type="user",
+        resource_id=str(user_row.get("id")),
+        actor_user_id=int(user_row.get("id")),
+        request_id=_request_id(request),
+        ip=ip,
+        user_agent=request.headers.get("user-agent", ""),
+        outcome="success",
+        payload={"revoked_count": revoked, "email": email},
+    )
+    db.commit()
+    return {"reset": True, "revoked_count": revoked}
 
 
 @router.post("/logout/")
-def logout(payload: LogoutPayload, request: Request, db: Session = Depends(get_db)):
+def logout(payload: LogoutPayload, request: Request, response: Response, db: Session = Depends(get_db)):
+    refresh_token = extract_refresh_token(request, payload.refresh)
+    if not refresh_token:
+        raise HTTPException(401, detail="Invalid refresh token")
     try:
-        data = decode_token(payload.refresh)
+        data = decode_token(refresh_token)
     except Exception:
         raise HTTPException(401, detail="Invalid refresh token")
 
@@ -986,11 +1070,12 @@ def logout(payload: LogoutPayload, request: Request, db: Session = Depends(get_d
         outcome="success" if affected > 0 else "failure",
     )
     db.commit()
+    clear_refresh_cookie(response)
     return {"revoked": affected > 0}
 
 
 @router.post("/logout_all/")
-def logout_all(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+def logout_all(request: Request, response: Response, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     affected = revoke_all_refresh_sessions_for_user(db, user_id=int(user["id"]))
     log_audit_event(
         db,
@@ -1006,4 +1091,5 @@ def logout_all(request: Request, user: dict = Depends(get_current_user), db: Ses
         payload={"revoked_count": affected},
     )
     db.commit()
+    clear_refresh_cookie(response)
     return {"revoked_count": affected}

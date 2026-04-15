@@ -54,6 +54,7 @@ class ProfileUpdatePayload(BaseModel):
     last_name: str | None = None
     phone: str | None = None
     email: str | None = None
+    is_courier_enabled: bool | None = None
     active_company_id: int | None = None
     company_name: str | None = None
     company_phone: str | None = None
@@ -216,6 +217,8 @@ def update_me(payload: ProfileUpdatePayload, user: dict = Depends(get_current_us
         if exists_email:
             raise HTTPException(status_code=409, detail="Email already in use")
         user_updates["email"] = email
+    if payload.is_courier_enabled is not None and "is_courier_enabled" in users.c:
+        user_updates["is_courier_enabled"] = bool(payload.is_courier_enabled)
 
     if user_updates:
         db.execute(update(users).where(users.c.id == u_id).values(user_updates))

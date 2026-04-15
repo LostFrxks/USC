@@ -1,0 +1,23 @@
+appId: com.usc.mobile
+---
+- launchApp
+- assertVisible: "USC Mobile"
+- tapOn: "Reset it"
+- assertVisible:
+    id: "screen-forgot-password"
+- tapOn:
+    id: "forgot-email"
+- inputText: "buyer1@usc.demo"
+- tapOn:
+    id: "forgot-submit"
+- assertVisible:
+    id: "screen-reset-password"
+- tapOn:
+    id: "reset-code"
+- inputText: "123456"
+- tapOn:
+    id: "reset-password"
+- inputText: "newpass123"
+- tapOn:
+    id: "reset-submit"
+- assertVisible: "USC Mobile"

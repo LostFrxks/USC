@@ -23,6 +23,15 @@ backend/.venv_local/
 # Node
 node_modules/
 frontend/node_modules/
+frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
+frontend/coverage/
+frontend/.vite/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+frontend/*.tsbuildinfo
 
 # Env files
 .env
@@ -37,6 +46,8 @@ frontend/dist/
 
 # Logs
 *.log
+!logs_by_date/
+!logs_by_date/*.log
 
 # External tools
 ops/codex_remote/

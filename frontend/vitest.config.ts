@@ -8,6 +8,11 @@ export default defineConfig({
     setupFiles: "./src/test/setup.ts",
     globals: true,
     css: true,
+    fileParallelism: false,
+    clearMocks: true,
+    restoreMocks: true,
+    unstubGlobals: true,
+    testTimeout: 15000,
     exclude: ["e2e/**", "node_modules/**", "dist/**"],
   },
 });

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+import re
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
@@ -33,6 +34,8 @@ from app.services.idempotency import reserve_idempotency, save_idempotency_respo
 from app.services.notifications import create_notification_event
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+_GEO_TAG_REGEX = re.compile(r"\[geo:[^\]]*]", re.IGNORECASE)
+_GEO_TAG_CAPTURE_REGEX = re.compile(r"\[\s*geo\s*:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*]", re.IGNORECASE)
 
 
 class OrderItemCreate(BaseModel):
@@ -43,6 +46,8 @@ class OrderItemCreate(BaseModel):
 class OrderCreatePayload(BaseModel):
     address: Optional[str] = None
     delivery_address: Optional[str] = None
+    delivery_lat: Optional[float] = None
+    delivery_lng: Optional[float] = None
     comment: str = ""
     buyer_company_id: int
     supplier_company_id: int
@@ -76,6 +81,15 @@ class OrderCreatePayload(BaseModel):
             return ORDER_STATUS_PENDING
         return up
 
+    def resolved_delivery_coords(self) -> tuple[float | None, float | None]:
+        if self.delivery_lat is None and self.delivery_lng is None:
+            return _parse_geo_tag(self.comment)
+        if self.delivery_lat is None or self.delivery_lng is None:
+            raise HTTPException(422, detail=_domain_error("INVALID_GEO_COORDS", "delivery_lat and delivery_lng must be provided together"))
+        if not _is_valid_geo(self.delivery_lat, self.delivery_lng):
+            raise HTTPException(422, detail=_domain_error("INVALID_GEO_COORDS", "delivery coordinates are out of range"))
+        return float(self.delivery_lat), float(self.delivery_lng)
+
 
 class OrderCreateResponse(BaseModel):
     id: int
@@ -87,6 +101,8 @@ class OrderListRow(BaseModel):
     status: str
     created_at: Optional[datetime] = None
     delivery_address: Optional[str] = None
+    delivery_lat: Optional[float] = None
+    delivery_lng: Optional[float] = None
     comment: Optional[str] = None
     items_count: Optional[int] = None
     total: Optional[float] = None
@@ -106,6 +122,8 @@ class OrderDetailOut(BaseModel):
     status: str
     created_at: Optional[datetime] = None
     delivery_address: Optional[str] = None
+    delivery_lat: Optional[float] = None
+    delivery_lng: Optional[float] = None
     comment: Optional[str] = None
     buyer_company_id: int
     supplier_company_id: int
@@ -176,6 +194,43 @@ def _serialize_delivery(db: Session, order_id: int) -> dict | None:
     }
 
 
+def _is_valid_geo(lat: float | int | None, lng: float | int | None) -> bool:
+    if lat is None or lng is None:
+        return False
+    try:
+        lat_f = float(lat)
+        lng_f = float(lng)
+    except Exception:
+        return False
+    return -90 <= lat_f <= 90 and -180 <= lng_f <= 180
+
+
+def _parse_geo_tag(comment: str | None) -> tuple[float | None, float | None]:
+    text = (comment or "").strip()
+    if not text:
+        return None, None
+    match = _GEO_TAG_CAPTURE_REGEX.search(text)
+    if not match:
+        return None, None
+    lat = float(match.group(1))
+    lng = float(match.group(2))
+    if not _is_valid_geo(lat, lng):
+        return None, None
+    return lat, lng
+
+
+def _format_geo_tag(lat: float, lng: float) -> str:
+    return f"[geo:{lat:.6f},{lng:.6f}]"
+
+
+def _append_geo_tag(comment: str | None, lat: float | None, lng: float | None) -> str:
+    base = _GEO_TAG_REGEX.sub("", (comment or "")).strip()
+    if lat is None or lng is None:
+        return base
+    tag = _format_geo_tag(lat, lng)
+    return f"{base}\n{tag}" if base else tag
+
+
 def _normalize_order_text(
     delivery_address: str | None,
     comment: str | None,
@@ -196,9 +251,16 @@ def _normalize_order_text(
 
 def _order_payload_with_text_fields(payload: dict) -> dict:
     delivery_address, comment = _normalize_order_text(payload.get("delivery_address"), payload.get("comment"))
+    delivery_lat = payload.get("delivery_lat")
+    delivery_lng = payload.get("delivery_lng")
+    if not _is_valid_geo(delivery_lat, delivery_lng):
+        parsed_lat, parsed_lng = _parse_geo_tag(comment)
+        delivery_lat, delivery_lng = parsed_lat, parsed_lng
     data = dict(payload)
     data["delivery_address"] = delivery_address
     data["comment"] = comment
+    data["delivery_lat"] = float(delivery_lat) if delivery_lat is not None else None
+    data["delivery_lng"] = float(delivery_lng) if delivery_lng is not None else None
     return data
 
 
@@ -278,6 +340,8 @@ def list_orders(
     o_status = _col(orders_order, "status")
     o_created_at = _col(orders_order, "created_at")
     o_delivery_address = _col(orders_order, "delivery_address")
+    o_delivery_lat = _col(orders_order, "delivery_lat")
+    o_delivery_lng = _col(orders_order, "delivery_lng")
     o_comment = _col(orders_order, "comment")
     o_buyer = _col(orders_order, "buyer_company_id")
     o_supplier = _col(orders_order, "supplier_company_id")
@@ -298,13 +362,15 @@ def list_orders(
             o_status.label("status"),
             o_created_at.label("created_at"),
             o_delivery_address.label("delivery_address"),
+            o_delivery_lat.label("delivery_lat"),
+            o_delivery_lng.label("delivery_lng"),
             o_comment.label("comment"),
             func.count(orders_item.c.id).label("items_count"),
             func.coalesce(func.sum(oi_qty * oi_price), 0).label("total"),
         )
         .select_from(orders_order.outerjoin(orders_item, oi_order_id == o_id))
         .where(cond)
-        .group_by(o_id, o_status, o_created_at, o_delivery_address, o_comment)
+        .group_by(o_id, o_status, o_created_at, o_delivery_address, o_delivery_lat, o_delivery_lng, o_comment)
         .order_by(o_id.desc())
         .limit(limit)
         .offset(offset)
@@ -373,6 +439,8 @@ def create_order(
     o_status = _col(orders_order, "status")
     o_delivery_mode = _col(orders_order, "delivery_mode")
     o_delivery_address = _col(orders_order, "delivery_address")
+    o_delivery_lat = _col(orders_order, "delivery_lat")
+    o_delivery_lng = _col(orders_order, "delivery_lng")
     o_comment = _col(orders_order, "comment")
     o_created_at = _col(orders_order, "created_at")
     o_buyer = _col(orders_order, "buyer_company_id")
@@ -407,7 +475,8 @@ def create_order(
         )
 
     address = payload.resolved_address()
-    comment_clean = (payload.comment or "").strip()
+    delivery_lat, delivery_lng = payload.resolved_delivery_coords()
+    comment_clean = _append_geo_tag((payload.comment or "").strip(), delivery_lat, delivery_lng)
     delivery_mode = payload.resolved_delivery_mode()
 
     try:
@@ -419,6 +488,8 @@ def create_order(
                     o_status.name: status,
                     o_delivery_mode.name: delivery_mode,
                     o_delivery_address.name: address,
+                    o_delivery_lat.name: delivery_lat,
+                    o_delivery_lng.name: delivery_lng,
                     o_comment.name: comment_clean,
                     o_created_at.name: now,
                     o_buyer.name: payload.buyer_company_id,
@@ -552,6 +623,8 @@ def order_detail(
     o_supplier = _col(orders_order, "supplier_company_id")
     o_status = _col(orders_order, "status")
     o_delivery_address = _col(orders_order, "delivery_address")
+    o_delivery_lat = _col(orders_order, "delivery_lat")
+    o_delivery_lng = _col(orders_order, "delivery_lng")
     o_comment = _col(orders_order, "comment")
     o_created_at = _col(orders_order, "created_at")
 
@@ -569,6 +642,8 @@ def order_detail(
             o_status.label("status"),
             o_created_at.label("created_at"),
             o_delivery_address.label("delivery_address"),
+            o_delivery_lat.label("delivery_lat"),
+            o_delivery_lng.label("delivery_lng"),
             o_comment.label("comment"),
             o_buyer.label("buyer_company_id"),
             o_supplier.label("supplier_company_id"),

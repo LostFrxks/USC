@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import HomeScreen from "./screens/HomeScreen";
 import SearchScreen from "./screens/SearchScreen";
 import CartScreen from "./screens/CartScreen";
@@ -26,10 +26,8 @@ import { useCart } from "./hooks/useCart";
 import { useToast } from "./hooks/useToast";
 import type { Product, Screen } from "./types";
 import type { Supplier } from "./api/suppliers";
-import { logout as clearAuth, logoutAllRequest, logoutLocal } from "./api/auth";
-import { isApiError, SESSION_EXPIRED_EVENT } from "./api/client";
-import { fetchNotifications } from "./api/notifications";
-import { fetchMe, type MeProfile } from "./api/profile";
+import { useAppSession } from "./hooks/useAppSession";
+import { hasAccessToken } from "./api/client";
 
 const TAB_ORDER: TabKey[] = ["home", "cart", "analytics", "ai", "profile"];
 
@@ -41,33 +39,13 @@ function hashSeed(input: string): number {
   return h;
 }
 
-function normalizeRole(input?: string | null): "buyer" | "supplier" {
-  return String(input || "").toLowerCase() === "supplier" ? "supplier" : "buyer";
-}
-
 export default function App() {
   const toast = useToast();
-  const initialAuthed = !!localStorage.getItem("usc_access_token");
-  const [authed, setAuthed] = useState(initialAuthed);
   const [activeTab, setActiveTab] = useState<TabKey>("home");
   const [tabTransitionDir, setTabTransitionDir] = useState<"forward" | "backward">("forward");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerScreen, setDrawerScreen] = useState<Screen | null>(null);
   const [companyPickerOpen, setCompanyPickerOpen] = useState(false);
-  const [profile, setProfile] = useState<MeProfile | null>(null);
-  const [profileLoading, setProfileLoading] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [profileNonce, setProfileNonce] = useState(0);
-  const [notificationCount, setNotificationCount] = useState(0);
-  const [companyId, setCompanyId] = useState<number | null>(() => {
-    const raw = localStorage.getItem("usc_company_id");
-    if (!raw) return null;
-    const num = Number(raw);
-    return Number.isFinite(num) ? num : null;
-  });
-  const [appRole, setAppRole] = useState<"buyer" | "supplier">(() => normalizeRole(localStorage.getItem("usc_app_role")));
-  const isSessionExpiringRef = useRef(false);
-
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [focusOrderId, setFocusOrderId] = useState<number | null>(null);
   const [supplierView, setSupplierView] = useState<{ id: string; name: string } | null>(null);
@@ -77,45 +55,34 @@ export default function App() {
   const [homeCategoryTouched, setHomeCategoryTouched] = useState(false);
   const [aiOnboardingAnswered, setAiOnboardingAnswered] = useState(false);
 
-  const [splashAnimationDone, setSplashAnimationDone] = useState(!initialAuthed);
-  const handleSessionExpired = useCallback(() => {
-    if (isSessionExpiringRef.current) return;
-    isSessionExpiringRef.current = true;
-    logoutLocal();
-    localStorage.removeItem("usc_company_id");
-    localStorage.removeItem("usc_company_name");
-    localStorage.removeItem("usc_app_role");
-    setAuthed(false);
-    setNotificationCount(0);
-    setProfile(null);
-    setProfileError(null);
-    setProfileLoading(false);
-    setCompanyId(null);
+  const [splashAnimationDone, setSplashAnimationDone] = useState(() => !hasAccessToken());
+  const resetUiAfterSessionExpiry = useCallback(() => {
     setCompanyPickerOpen(false);
     setDrawerOpen(false);
     setDrawerScreen(null);
     setOrdersOpen(false);
     setSupplierView(null);
-    window.setTimeout(() => {
-      isSessionExpiringRef.current = false;
-    }, 50);
   }, []);
-
-  useEffect(() => {
-    const onSessionExpired = () => handleSessionExpired();
-    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired as EventListener);
-    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired as EventListener);
-  }, [handleSessionExpired]);
-
-  useEffect(() => {
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === "usc_access_token" && !event.newValue) {
-        handleSessionExpired();
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [handleSessionExpired]);
+  const {
+    authed,
+    sessionBootstrapDone,
+    profile,
+    profileLoading,
+    profileError,
+    notificationCount,
+    companyId,
+    appRole,
+    setAppRole,
+    setProfile,
+    setProfileNonce,
+    setNotificationCount,
+    setCompanyId,
+    handleSessionExpired,
+    handleAuthSuccess,
+    handleLogout,
+    handleLogoutAll,
+    handleSwitchCompany,
+  } = useAppSession({ onSessionExpiredUiReset: resetUiAfterSessionExpiry });
 
   useEffect(() => {
     if (!authed) {
@@ -127,126 +94,9 @@ export default function App() {
     return () => clearTimeout(t);
   }, [authed]);
 
-  useEffect(() => {
-    if (!authed) {
-      setProfile(null);
-      setProfileError(null);
-      setProfileLoading(false);
-      return;
-    }
-
-    let alive = true;
-    setProfileLoading(true);
-    setProfileError(null);
-
-    fetchMe()
-      .then((data) => {
-        if (!alive) return;
-        setProfile(data);
-
-        const storedRaw = localStorage.getItem("usc_company_id");
-        const storedId = storedRaw ? Number(storedRaw) : null;
-        const storedValid =
-          storedId != null &&
-          Number.isFinite(storedId) &&
-          (data.companies || []).some((c) => c.company_id === storedId);
-
-        if (data.companies?.length === 1) {
-          const onlyCompany = data.companies[0];
-          const onlyId = onlyCompany.company_id;
-          setCompanyId(onlyId);
-          localStorage.setItem("usc_company_id", String(onlyId));
-          localStorage.setItem("usc_company_name", onlyCompany.name || "");
-          return;
-        }
-
-        if (storedValid) {
-          setCompanyId(storedId);
-          const storedCompany = data.companies?.find((c) => c.company_id === storedId);
-          if (storedCompany) localStorage.setItem("usc_company_name", storedCompany.name || "");
-        } else {
-          setCompanyId(null);
-          localStorage.removeItem("usc_company_id");
-          localStorage.removeItem("usc_company_name");
-        }
-      })
-      .catch((error: unknown) => {
-        if (!alive) return;
-        if (isApiError(error) && error.status === 401) {
-          handleSessionExpired();
-          return;
-        }
-        setProfileError("\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u043f\u0440\u043e\u0444\u0438\u043b\u044c");
-        setProfile(null);
-      })
-      .finally(() => {
-        if (!alive) return;
-        setProfileLoading(false);
-      });
-
-    return () => {
-      alive = false;
-    };
-  }, [authed, profileNonce, handleSessionExpired]);
-
-  useEffect(() => {
-    if (!authed || !localStorage.getItem("usc_access_token")) {
-      setNotificationCount(0);
-      return;
-    }
-
-    let alive = true;
-    let timer: number | null = null;
-    const load = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
-        return;
-      }
-      if (!localStorage.getItem("usc_access_token")) {
-        alive = false;
-        if (timer != null) window.clearInterval(timer);
-        handleSessionExpired();
-        return;
-      }
-      fetchNotifications(30)
-        .then((data) => {
-          if (!alive) return;
-          setNotificationCount(data.unread_count ?? 0);
-        })
-        .catch((error: unknown) => {
-          if (!alive) return;
-          if (isApiError(error) && error.status === 401) {
-            alive = false;
-            if (timer != null) window.clearInterval(timer);
-            handleSessionExpired();
-            return;
-          }
-          setNotificationCount(0);
-        });
-    };
-
-    load();
-    timer = window.setInterval(load, 20000);
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        load();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      alive = false;
-      if (timer != null) window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [authed, handleSessionExpired]);
-
-  useEffect(() => {
-    localStorage.setItem("usc_app_role", appRole);
-  }, [appRole]);
-
   const cart = useCart();
   const cartItems = useMemo(() => cart.items, [cart.items]);
   const currentCompany = profile?.companies?.find((c) => c.company_id === companyId) ?? null;
-  const currentCompanyType = String(currentCompany?.company_type || "").toUpperCase();
   const currentCompanyName = currentCompany?.name ?? null;
   const reputation = useMemo(() => {
     const seedSource = `${profile?.email ?? ""}|${profile?.role ?? ""}|${currentCompanyName ?? ""}`;
@@ -261,14 +111,7 @@ export default function App() {
     };
   }, [profile?.email, profile?.role, currentCompanyName]);
 
-  useEffect(() => {
-    if (!profile) return;
-    const companyBasedRole = currentCompanyType === "SUPPLIER" ? "supplier" : currentCompanyType === "BUYER" ? "buyer" : null;
-    const savedRole = normalizeRole(localStorage.getItem("usc_app_role"));
-    setAppRole(companyBasedRole ?? savedRole ?? normalizeRole(profile.role));
-  }, [profile, currentCompanyType]);
-
-  const keepSplashVisible = authed && (!splashAnimationDone || profileLoading);
+  const keepSplashVisible = authed && !splashAnimationDone;
   const onboardingContext = useMemo(() => {
     if (!profile || companyId == null) return null;
     const userId = Number(profile.id);
@@ -341,20 +184,8 @@ export default function App() {
 
   const openDrawer = () => setDrawerOpen(true);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
-  const handleLogout = async () => {
-    await clearAuth().catch(() => undefined);
-    handleSessionExpired();
-  };
-
-  const handleLogoutAll = async () => {
-    await logoutAllRequest().catch(() => undefined);
-    handleSessionExpired();
-  };
-
-  const handleSwitchCompany = () => {
-    setCompanyId(null);
-    localStorage.removeItem("usc_company_id");
-    localStorage.removeItem("usc_company_name");
+  const handleOpenCompanyPicker = () => {
+    handleSwitchCompany();
     setDrawerOpen(false);
     setCompanyPickerOpen(true);
   };
@@ -401,10 +232,10 @@ export default function App() {
     }
   }, [activeTab, closeDrawer, drawerOpen, goTab, onboarding.isRunning, onboardingStep]);
 
-  const handleAuthSuccess = useCallback(() => {
+  const handleAuthSuccessWithSplash = useCallback(() => {
     setSplashAnimationDone(false);
-    setAuthed(true);
-  }, []);
+    handleAuthSuccess();
+  }, [handleAuthSuccess]);
 
   const openFilters = () => {
     // Filters panel is not implemented yet.
@@ -457,10 +288,32 @@ export default function App() {
   const screensLocked = !!supplierView || ordersOpen || !!drawerScreen;
   const screensClassName = `screens ${!screensLocked ? `tab-transition-${tabTransitionDir}` : ""}`.trim();
 
+  if (!sessionBootstrapDone) {
+    return <div className="app" />;
+  }
+
   if (!authed) {
     return (
       <div className="app">
-        <AuthScreen onSuccess={handleAuthSuccess} />
+        <AuthScreen onSuccess={handleAuthSuccessWithSplash} />
+      </div>
+    );
+  }
+
+  if (!splashAnimationDone) {
+    return (
+      <div className="app">
+        <div id="splash" className="splash">
+          <div className="splash-logo-row">
+            <img src="/media/u.svg" className="splash-letter splash-u" alt="U" />
+            <img src="/media/s.svg" className="splash-letter splash-s" alt="S" />
+            <img src="/media/c.svg" className="splash-letter splash-c" alt="C" />
+            <img src="/media/chain.svg" className="splash-letter splash-chain" alt="Chain" />
+          </div>
+          <div className="splash-tagline">
+            <img src="/media/desc.svg" className="splash-desc" alt="Unity supply chain" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -489,25 +342,13 @@ export default function App() {
 
   return (
     <div className={`app ${drawerOpen ? "drawer-open" : ""}`}>
-      <div id="splash" className={`splash ${keepSplashVisible ? "" : "splash-hide"}`}>
-        <div className="splash-logo-row">
-          <img src="/media/u.svg" className="splash-letter splash-u" alt="U" />
-          <img src="/media/s.svg" className="splash-letter splash-s" alt="S" />
-          <img src="/media/c.svg" className="splash-letter splash-c" alt="C" />
-          <img src="/media/chain.svg" className="splash-letter splash-chain" alt="Chain" />
-        </div>
-        <div className="splash-tagline">
-          <img src="/media/desc.svg" className="splash-desc" alt="Unity supply chain" />
-        </div>
-      </div>
-
       <Drawer
         open={drawerOpen}
         onClose={closeDrawer}
         onGo={openDrawerScreen}
         onLogout={handleLogout}
         onLogoutAll={handleLogoutAll}
-        onSwitchCompany={() => setCompanyPickerOpen(true)}
+          onSwitchCompany={handleOpenCompanyPicker}
         companyName={currentCompanyName}
         role={appRole}
         onRoleChange={setAppRole}
@@ -586,7 +427,7 @@ export default function App() {
           onBurger={openDrawer}
           profile={profile}
           companyName={currentCompanyName}
-          onSwitchCompany={handleSwitchCompany}
+          onSwitchCompany={handleOpenCompanyPicker}
           showCompanyBanner={!!needsCompany}
           onPickCompany={() => setCompanyPickerOpen(true)}
           ratingValue={reputation.rating}

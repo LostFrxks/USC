@@ -29,6 +29,7 @@ export type UpdateMePayload = {
   last_name?: string;
   phone?: string;
   email?: string;
+  is_courier_enabled?: boolean;
   active_company_id?: number;
   company_name?: string;
   company_phone?: string;

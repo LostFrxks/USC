@@ -96,3 +96,46 @@ def test_courier_must_belong_to_order_companies(client, db_session):
 
     assert response.status_code == 400
     assert response.json()["detail"] == "courier must belong to buyer or supplier company"
+
+
+def test_supplier_manager_can_list_assignable_couriers_for_order(client, db_session):
+    seed_user(db_session, user_id=2, email="manager@test.local")
+    seed_user(db_session, user_id=50, email="courier1@test.local")
+    seed_user(db_session, user_id=51, email="courier2@test.local")
+    db_session.execute(update(accounts_user).where(accounts_user.c.id == 50).values({"is_courier_enabled": True}))
+    db_session.execute(update(accounts_user).where(accounts_user.c.id == 51).values({"is_courier_enabled": True}))
+    seed_company(db_session, company_id=10, name="Buyer", company_type="BUYER")
+    seed_company(db_session, company_id=20, name="Supplier", company_type="SUPPLIER")
+    seed_membership(db_session, member_id=1, user_id=2, company_id=20, role="MANAGER")
+    seed_membership(db_session, member_id=2, user_id=50, company_id=10, role="MEMBER")
+    seed_membership(db_session, member_id=3, user_id=51, company_id=20, role="MEMBER")
+    seed_order(db_session, order_id=101, buyer_company_id=10, supplier_company_id=20, status="CONFIRMED", comment="Door 3")
+    db_session.commit()
+
+    response = client.get(
+        "/api/deliveries/couriers/by_order/101/",
+        headers=auth_headers(2, "manager@test.local"),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [row["id"] for row in payload] == [50, 51]
+    assert payload[0]["company_ids"] == [10]
+    assert payload[1]["company_ids"] == [20]
+
+
+def test_non_supplier_manager_cannot_list_assignable_couriers(client, db_session):
+    seed_user(db_session, user_id=1, email="buyer@test.local")
+    seed_company(db_session, company_id=10, name="Buyer", company_type="BUYER")
+    seed_company(db_session, company_id=20, name="Supplier", company_type="SUPPLIER")
+    seed_membership(db_session, member_id=1, user_id=1, company_id=10, role="OWNER")
+    seed_order(db_session, order_id=101, buyer_company_id=10, supplier_company_id=20, status="CONFIRMED", comment="Door 3")
+    db_session.commit()
+
+    response = client.get(
+        "/api/deliveries/couriers/by_order/101/",
+        headers=auth_headers(1, "buyer@test.local"),
+    )
+
+    assert response.status_code == 403
+    assert "supplier delivery managers" in response.json()["detail"]

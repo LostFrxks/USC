@@ -486,7 +486,7 @@ export default function AnalyticsScreen({
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [assistantOpen, assistantDragging]);
+  }, [assistantOpen, assistantDragging, assistantPanelBottom, assistantPanelHeight]);
 
   useEffect(() => {
     const onPointerMove = (e: PointerEvent) => {
