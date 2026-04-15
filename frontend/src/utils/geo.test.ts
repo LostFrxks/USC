@@ -40,7 +40,7 @@ describe("geo utils", () => {
   });
 
   it("strips geo tag from display text", () => {
-    expect(stripGeoTag("РџРѕР·РІРѕРЅРёС‚Рµ\n[geo:42.874600,74.569800]")).toBe("РџРѕР·РІРѕРЅРёС‚Рµ");
+    expect(stripGeoTag("Позвоните\n[geo:42.874600,74.569800]")).toBe("Позвоните");
     expect(stripGeoTag("[geo:42.874600,74.569800]")).toBe("");
   });
 

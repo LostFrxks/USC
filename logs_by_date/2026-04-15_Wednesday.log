@@ -2,3 +2,10 @@
 - Updated backend auth/session flows with cookie and token services, refresh-session changes, and related API/tests.
 - Expanded analytics and delivery/order capabilities, including new assistant/cache/insight services and delivery coordinate support.
 - Refreshed frontend app/session/cart/chat/orders flows, added mobile/shared modules, and updated repo/docker/docs configuration files.
+2026-04-15 14:15:11
+- Fixed web company-role switching so supplier/buyer mode is driven by active company selection instead of a free local toggle.
+- Removed fake web runtime metrics from profile/catalog UI, added backend completed_orders in profile payload, and updated web tests for the new contract.
+- Changed web onboarding persistence from per-company to per-role with legacy key migration and reduced product list flicker by preserving previous results during refresh.
+2026-04-15 14:21:45
+- Expanded .gitignore for frontend/frontend_mobile local cache and generated TypeScript/Expo artifacts.
+- Fixed the mojibake regression in frontend geo tests and cleaned related encoding-garbled comments in screens.css to satisfy encoding checks.

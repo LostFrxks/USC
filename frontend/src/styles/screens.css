@@ -4634,7 +4634,7 @@
 }
 
 /* ===========================
-   SUPPLIERS вЂ” same style as your CSS
+   SUPPLIERS - same style as your CSS
    =========================== */
 
 .supplier-list {
@@ -4655,7 +4655,7 @@
   justify-content: space-between;
   gap: 10px;
 
-  min-width: 0; /* РІР°Р¶РЅРѕ С‡С‚РѕР±С‹ ellipsis СЂР°Р±РѕС‚Р°Р» */
+  min-width: 0; /* важно, чтобы ellipsis работал */
 }
 
 .supplier-left {
@@ -4687,7 +4687,7 @@
 }
 
 .supplier-name {
-  font-weight: 700;           /* РєР°Рє РѕР±С‰РёР№ РІР°Р№Р± Сѓ С‚РµР±СЏ */
+  font-weight: 700;           /* как общий вайб у тебя */
   font-size: 13px;
   color: #111827;
   line-height: 1.15;
@@ -4705,7 +4705,7 @@
   text-overflow: ellipsis;
 }
 
-/* РєРЅРѕРїРєР° РІ С‚РѕС‡РЅРѕСЃС‚Рё РєР°Рє С‚РІРѕР№ .primary-button */
+/* кнопка в точности как твой .primary-button */
 .supplier-open {
   border: none;
   border-radius: 999px;
@@ -4722,7 +4722,7 @@
   transform: scale(0.98);
 }
 
-/* ===== responsive РІ С‚РІРѕС‘Рј СЃС‚РёР»Рµ ===== */
+/* ===== responsive в твоем стиле ===== */
 @media (max-width: 360px) {
   .supplier-card {
     padding: 9px 10px;
@@ -4754,7 +4754,7 @@
 }
 
 
-/* РїРѕР»СЏ */
+/* поля */
 .field {
   display: flex;
   flex-direction: column;
@@ -4790,7 +4790,7 @@ textarea.field-input {
   line-height: 1.35;
 }
 
-/* РёС‚РѕРіРѕ */
+/* итого */
 .modal-total {
   margin-top: 2px;
   padding: 10px 12px;
@@ -4807,7 +4807,7 @@ textarea.field-input {
   font-size: 14px;
 }
 
-/* primary button вЂ” РєР°Рє С‚РІРѕР№ .primary-button */
+/* primary button - как твой .primary-button */
 .modal-primary {
   margin-top: 2px;
   width: 100%;
@@ -4832,12 +4832,12 @@ textarea.field-input {
 }
 
 /* ===========================
-   RESPONSIVE вЂ” in your style
+   RESPONSIVE - in your style
    =========================== */
 
 @media (min-width: 421px) {
   .modal-backdrop {
-    align-items: center; /* РЅР° Р±РѕР»СЊС€РёС… СЌРєСЂР°РЅР°С… РїРѕ С†РµРЅС‚СЂСѓ */
+    align-items: center; /* на больших экранах по центру */
   }
 }
 

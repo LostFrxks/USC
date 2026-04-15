@@ -32,8 +32,8 @@ export type Product = {
   certifications?: string | null;
   lead_time_days?: number | null;
   price: number;
-  rating: string; // как в старом дизайне ("4.9")
-  reviews: number;
+  rating?: string | null;
+  reviews?: number | null;
   image: string; // "media/xxx.jpg"
   category: Category;
 

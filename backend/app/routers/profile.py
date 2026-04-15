@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.cache.redis_cache import get_json, invalidate_patterns, make_key, set_json
@@ -13,6 +13,7 @@ from app.db.deps import get_db
 from app.db.schema import accounts_user as users
 from app.db.schema import companies_company as companies
 from app.db.schema import companies_companymember as company_members
+from app.db.schema import orders_order as orders
 from app.deps.auth import get_current_user
 from app.services.audit import log_audit_event
 
@@ -93,6 +94,37 @@ def _ensure_company_for_user(*, user: dict, db: Session):
     db.commit()
 
 
+def _completed_order_counts(*, db: Session, company_ids: list[int]) -> tuple[dict[int, int], dict[int, int]]:
+    if not company_ids:
+        return {}, {}
+
+    buyer_rows = db.execute(
+        select(
+            orders.c.buyer_company_id.label("company_id"),
+            func.count().label("completed_orders"),
+        )
+        .where(
+            orders.c.status == "DELIVERED",
+            orders.c.buyer_company_id.in_(company_ids),
+        )
+        .group_by(orders.c.buyer_company_id)
+    ).all()
+    supplier_rows = db.execute(
+        select(
+            orders.c.supplier_company_id.label("company_id"),
+            func.count().label("completed_orders"),
+        )
+        .where(
+            orders.c.status == "DELIVERED",
+            orders.c.supplier_company_id.in_(company_ids),
+        )
+        .group_by(orders.c.supplier_company_id)
+    ).all()
+    buyer_counts = {int(row.company_id): int(row.completed_orders or 0) for row in buyer_rows if row.company_id is not None}
+    supplier_counts = {int(row.company_id): int(row.completed_orders or 0) for row in supplier_rows if row.company_id is not None}
+    return buyer_counts, supplier_counts
+
+
 def _me_payload(*, user: dict, db: Session):
     u_id = int(user["id"])
 
@@ -129,17 +161,28 @@ def _me_payload(*, user: dict, db: Session):
         except Exception:
             rows = []
 
-    companies_payload = [
-        {
-            "company_id": int(r["company_id"]),
-            "name": r["name"],
-            "company_type": r["company_type"],
-            "phone": r.get("phone"),
-            "address": r.get("address"),
-            "role": r["role"],
-        }
-        for r in rows
-    ]
+    company_ids = [int(r["company_id"]) for r in rows if r.get("company_id") is not None]
+    buyer_counts, supplier_counts = _completed_order_counts(db=db, company_ids=company_ids)
+
+    companies_payload = []
+    for r in rows:
+        company_id = int(r["company_id"])
+        company_type = str(r.get("company_type") or "").upper()
+        if company_type == "SUPPLIER":
+            completed_orders = supplier_counts.get(company_id, 0)
+        else:
+            completed_orders = buyer_counts.get(company_id, 0)
+        companies_payload.append(
+            {
+                "company_id": company_id,
+                "name": r["name"],
+                "company_type": r["company_type"],
+                "phone": r.get("phone"),
+                "address": r.get("address"),
+                "role": r["role"],
+                "completed_orders": completed_orders,
+            }
+        )
 
     role = _get_role_from_row(user)
     if not role:

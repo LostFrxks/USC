@@ -32,6 +32,12 @@ frontend/.env
 frontend/.env.*
 !frontend/.env.example
 frontend/*.tsbuildinfo
+frontend/.eslintcache
+frontend_mobile/node_modules/
+frontend_mobile/.expo/
+frontend_mobile/dist/
+frontend_mobile/expo-env.d.ts
+**/*.tsbuildinfo
 
 # Env files
 .env

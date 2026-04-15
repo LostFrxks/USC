@@ -7,27 +7,29 @@ function normalizeType(value?: string | null) {
 function filterCompanies(companies: CompanyMembership[], role?: string | null) {
   if (!role) return companies;
   const normalizedRole = role.toLowerCase();
-  const filtered = companies.filter((c) => normalizeType(c.company_type).includes(normalizedRole));
-  return filtered.length > 0 ? filtered : companies;
+  return companies.filter((c) => normalizeType(c.company_type) === normalizedRole);
 }
 
 export default function CompanyPickerScreen({
   profile,
   selectedId,
+  roleFilter,
   onSelect,
   onLogout,
   onClose,
 }: {
   profile: MeProfile;
   selectedId: number | null;
+  roleFilter?: "buyer" | "supplier" | null;
   onSelect: (id: number) => void;
   onLogout: () => void;
   onClose?: () => void;
 }) {
-  const companies = filterCompanies(profile.companies || [], profile.role || undefined);
+  const companies = filterCompanies(profile.companies || [], roleFilter || undefined);
 
   const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim();
   const subtitle = fullName || profile.email || "USC пользователь";
+  const title = roleFilter === "supplier" ? "Выберите компанию поставщика" : roleFilter === "buyer" ? "Выберите компанию покупателя" : "Выберите компанию";
 
   if (!companies.length) {
     return (
@@ -35,7 +37,13 @@ export default function CompanyPickerScreen({
         <div className="company-card">
           <img src="/media/usc.svg" alt="USC" className="company-logo" />
           <div className="company-title">Нет компаний</div>
-          <div className="company-subtitle">Для этого аккаунта нет доступных компаний.</div>
+          <div className="company-subtitle">
+            {roleFilter === "supplier"
+              ? "Для этого аккаунта нет доступных компаний поставщика."
+              : roleFilter === "buyer"
+                ? "Для этого аккаунта нет доступных компаний покупателя."
+                : "Для этого аккаунта нет доступных компаний."}
+          </div>
           <button className="primary-button" type="button" onClick={onLogout}>
             Выйти
           </button>
@@ -53,7 +61,7 @@ export default function CompanyPickerScreen({
           </button>
         )}
         <img src="/media/usc.svg" alt="USC" className="company-logo" />
-        <div className="company-title">Выберите компанию</div>
+        <div className="company-title">{title}</div>
         <div className="company-subtitle">{subtitle}</div>
 
         <div className="company-list">

@@ -41,6 +41,9 @@ export function ProductCard({
   const facts = renderProductFacts(product);
   const brandLine = [product.brand, product.manufacturer].filter(Boolean).join(" • ");
   const hasQualityMeta = Boolean(product.allergens || product.certifications);
+  const ratingText = product.rating ? String(product.rating).trim() : "";
+  const reviewsCount = typeof product.reviews === "number" && Number.isFinite(product.reviews) ? product.reviews : null;
+  const showRating = Boolean(ratingText) || reviewsCount != null;
 
   const isInteractive = typeof onOpen === "function";
 
@@ -103,10 +106,12 @@ export function ProductCard({
           </div>
         ) : null}
 
-        <div className="product-rating">
-          <span>★ {product.rating}</span>
-          <span className="muted">• {product.reviews} оценок</span>
-        </div>
+        {showRating ? (
+          <div className="product-rating">
+            {ratingText ? <span>{`★ ${ratingText}`}</span> : null}
+            {reviewsCount != null ? <span className="muted">{`${ratingText ? "• " : ""}${reviewsCount} оценок`}</span> : null}
+          </div>
+        ) : null}
 
         <button
           className="primary-button"

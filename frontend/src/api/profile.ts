@@ -7,6 +7,7 @@ export type CompanyMembership = {
   phone?: string | null;
   address?: string | null;
   role?: string | null;
+  completed_orders?: number | null;
 };
 
 export type MeProfile = {

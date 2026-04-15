@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from app.db.schema import accounts_user, companies_company
-from tests.test_helpers import auth_headers, seed_company, seed_membership, seed_user
+from tests.test_helpers import auth_headers, seed_company, seed_membership, seed_order, seed_user
 
 
 def test_profile_patch_success_updates_user_and_company(client, db_session):
@@ -90,3 +90,41 @@ def test_profile_patch_company_without_membership_returns_403(client, db_session
     )
 
     assert response.status_code == 403
+
+
+def test_auth_me_includes_completed_orders_per_company_type(client, db_session):
+    seed_user(db_session, user_id=10, email="owner@test.local")
+    seed_company(db_session, company_id=100, name="Buyer Co", company_type="BUYER")
+    seed_company(db_session, company_id=200, name="Supplier Co", company_type="SUPPLIER")
+    seed_company(db_session, company_id=300, name="Other Supplier", company_type="SUPPLIER")
+    seed_membership(db_session, member_id=1, user_id=10, company_id=100)
+    seed_membership(db_session, member_id=2, user_id=10, company_id=200)
+    seed_order(
+        db_session,
+        order_id=1000,
+        buyer_company_id=100,
+        supplier_company_id=200,
+        status="DELIVERED",
+    )
+    seed_order(
+        db_session,
+        order_id=1001,
+        buyer_company_id=100,
+        supplier_company_id=300,
+        status="DELIVERED",
+    )
+    seed_order(
+        db_session,
+        order_id=1002,
+        buyer_company_id=100,
+        supplier_company_id=200,
+        status="CANCELLED",
+    )
+    db_session.commit()
+
+    response = client.get("/api/auth/me/", headers=auth_headers(10, "owner@test.local"))
+
+    assert response.status_code == 200
+    companies_payload = {item["company_id"]: item for item in response.json()["companies"]}
+    assert companies_payload[100]["completed_orders"] == 2
+    assert companies_payload[200]["completed_orders"] == 1

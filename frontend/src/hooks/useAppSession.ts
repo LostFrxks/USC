@@ -1,13 +1,9 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
 import { bootstrapSession, logout as clearAuth, logoutAllRequest, logoutLocal } from "../api/auth";
 import { hasAccessToken, isApiError, SESSION_EXPIRED_EVENT } from "../api/client";
 import { fetchNotifications } from "../api/notifications";
 import { fetchMe, type MeProfile } from "../api/profile";
-
-function normalizeRole(input?: string | null): "buyer" | "supplier" {
-  return String(input || "").toLowerCase() === "supplier" ? "supplier" : "buyer";
-}
 
 type UseAppSessionOptions = {
   onSessionExpiredUiReset?: () => void;
@@ -22,7 +18,6 @@ type UseAppSessionResult = {
   notificationCount: number;
   companyId: number | null;
   appRole: "buyer" | "supplier";
-  setAppRole: (next: "buyer" | "supplier") => void;
   setProfile: (next: MeProfile | null) => void;
   setProfileNonce: Dispatch<SetStateAction<number>>;
   setNotificationCount: Dispatch<SetStateAction<number>>;
@@ -49,8 +44,13 @@ export function useAppSession(options: UseAppSessionOptions = {}): UseAppSession
     const num = Number(raw);
     return Number.isFinite(num) ? num : null;
   });
-  const [appRole, setAppRole] = useState<"buyer" | "supplier">(() => normalizeRole(localStorage.getItem("usc_app_role")));
   const [isSessionExpiring, setIsSessionExpiring] = useState(false);
+
+  const appRole = useMemo<"buyer" | "supplier">(() => {
+    const currentCompany = profile?.companies?.find((company) => company.company_id === companyId) ?? null;
+    const currentCompanyType = String(currentCompany?.company_type || "").toUpperCase();
+    return currentCompanyType === "SUPPLIER" ? "supplier" : "buyer";
+  }, [companyId, profile?.companies]);
 
   const handleSessionExpired = useCallback(() => {
     if (isSessionExpiring) return;
@@ -206,20 +206,6 @@ export function useAppSession(options: UseAppSessionOptions = {}): UseAppSession
     };
   }, [authed, handleSessionExpired]);
 
-  useEffect(() => {
-    localStorage.setItem("usc_app_role", appRole);
-  }, [appRole]);
-
-  useEffect(() => {
-    if (!profile) return;
-    const currentCompany = profile.companies?.find((company) => company.company_id === companyId) ?? null;
-    const currentCompanyType = String(currentCompany?.company_type || "").toUpperCase();
-    const companyBasedRole =
-      currentCompanyType === "SUPPLIER" ? "supplier" : currentCompanyType === "BUYER" ? "buyer" : null;
-    const savedRole = normalizeRole(localStorage.getItem("usc_app_role"));
-    setAppRole(companyBasedRole ?? savedRole ?? normalizeRole(profile.role));
-  }, [profile, companyId]);
-
   const handleAuthSuccess = useCallback(() => {
     setSessionBootstrapDone(true);
     setAuthed(true);
@@ -250,7 +236,6 @@ export function useAppSession(options: UseAppSessionOptions = {}): UseAppSession
     notificationCount,
     companyId,
     appRole,
-    setAppRole,
     setProfile,
     setProfileNonce,
     setNotificationCount,

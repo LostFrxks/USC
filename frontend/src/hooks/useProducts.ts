@@ -1,17 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchProducts } from "../api/products";
 import type { Product } from "../types";
 
 export function useProducts(categoryId: number | null, query: string) {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [apiProducts, setApiProducts] = useState<Product[]>([]);
   const [apiOk, setApiOk] = useState(true);
+  const hasRenderedProductsRef = useRef(false);
+
+  useEffect(() => {
+    hasRenderedProductsRef.current = apiProducts.length > 0;
+  }, [apiProducts.length]);
 
   useEffect(() => {
     let alive = true;
 
     const timer = window.setTimeout(() => {
-      setLoading(true);
+      const hasRenderedProducts = hasRenderedProductsRef.current;
+      if (hasRenderedProducts) setRefreshing(true);
+      else setLoading(true);
 
       fetchProducts({ categoryId: categoryId ?? undefined, q: query || undefined })
         .then((data) => {
@@ -22,11 +30,12 @@ export function useProducts(categoryId: number | null, query: string) {
         .catch(() => {
           if (!alive) return;
           setApiOk(false);
-          setApiProducts([]);
+          if (!hasRenderedProducts) setApiProducts([]);
         })
         .finally(() => {
           if (!alive) return;
           setLoading(false);
+          setRefreshing(false);
         });
     }, 140);
 
@@ -36,5 +45,5 @@ export function useProducts(categoryId: number | null, query: string) {
     };
   }, [categoryId, query]);
 
-  return { products: apiProducts, loading, apiOk, apiEmpty: apiOk && apiProducts.length === 0 };
+  return { products: apiProducts, loading, refreshing, apiOk, apiEmpty: apiOk && apiProducts.length === 0 };
 }

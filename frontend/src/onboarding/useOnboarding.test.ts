@@ -123,4 +123,46 @@ describe("useOnboarding", () => {
     expect(result.current.isRunning).toBe(true);
     expect(result.current.stepIndex).toBe(1);
   });
+
+  it("does not restart a completed guide when only the company changes within the same role", async () => {
+    const { result, rerender } = renderHook(
+      ({ context }) =>
+        useOnboarding({
+          enabled: true,
+          context,
+          stepsCount: 8,
+        }),
+      { initialProps: { context: ctx } }
+    );
+
+    await waitFor(() => expect(result.current.isRunning).toBe(true));
+    act(() => {
+      result.current.finish();
+    });
+
+    rerender({ context: { ...ctx, companyId: 99 } });
+    await waitFor(() => expect(result.current.isRunning).toBe(false));
+    expect(result.current.stepIndex).toBe(7);
+  });
+
+  it("starts a separate guide when the role changes", async () => {
+    const { result, rerender } = renderHook(
+      ({ context }) =>
+        useOnboarding({
+          enabled: true,
+          context,
+          stepsCount: 4,
+        }),
+      { initialProps: { context: ctx } }
+    );
+
+    await waitFor(() => expect(result.current.isRunning).toBe(true));
+    act(() => {
+      result.current.finish();
+    });
+
+    rerender({ context: { ...ctx, role: "supplier", companyId: 30 } });
+    await waitFor(() => expect(result.current.isRunning).toBe(true));
+    expect(result.current.stepIndex).toBe(0);
+  });
 });

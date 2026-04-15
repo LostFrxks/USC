@@ -24,6 +24,29 @@ describe("onboarding storage", () => {
     expect(buildOnboardingStateKey(ctx)).toContain("usc.onboarding.v1.state");
   });
 
+  it("migrates the latest legacy per-company state into the new per-role key", () => {
+    localStorage.setItem(
+      "usc.onboarding.v1.state.10.21.buyer",
+      JSON.stringify({
+        ...makeOnboardingState("in_progress", 2),
+        lastUpdatedAt: 10,
+      })
+    );
+    localStorage.setItem(
+      "usc.onboarding.v1.state.10.99.buyer",
+      JSON.stringify({
+        ...makeOnboardingState("completed", 6),
+        lastUpdatedAt: 20,
+      })
+    );
+
+    const restored = readOnboardingState(ctx);
+
+    expect(restored?.status).toBe("completed");
+    expect(restored?.stepIndex).toBe(6);
+    expect(localStorage.getItem(buildOnboardingStateKey(ctx))).toContain("\"status\":\"completed\"");
+  });
+
   it("ignores incompatible or malformed state payload", () => {
     localStorage.setItem(
       buildOnboardingStateKey(ctx),
@@ -45,5 +68,12 @@ describe("onboarding storage", () => {
     setOnboardingReplayRequested(ctx, false);
     expect(isOnboardingReplayRequested(ctx)).toBe(false);
   });
-});
 
+  it("migrates a legacy replay flag into the per-role key", () => {
+    localStorage.setItem("usc.onboarding.v1.replay_once.10.21.buyer", "1");
+
+    expect(isOnboardingReplayRequested(ctx)).toBe(true);
+    expect(localStorage.getItem(buildOnboardingReplayKey(ctx))).toBe("1");
+    expect(localStorage.getItem("usc.onboarding.v1.replay_once.10.21.buyer")).toBeNull();
+  });
+});

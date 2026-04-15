@@ -31,14 +31,6 @@ import { hasAccessToken } from "./api/client";
 
 const TAB_ORDER: TabKey[] = ["home", "cart", "analytics", "ai", "profile"];
 
-function hashSeed(input: string): number {
-  let h = 0;
-  for (let i = 0; i < input.length; i += 1) {
-    h = (h * 31 + input.charCodeAt(i)) >>> 0;
-  }
-  return h;
-}
-
 export default function App() {
   const toast = useToast();
   const [activeTab, setActiveTab] = useState<TabKey>("home");
@@ -51,6 +43,7 @@ export default function App() {
   const [supplierView, setSupplierView] = useState<{ id: string; name: string } | null>(null);
   const [searchPreset, setSearchPreset] = useState<{ categoryId: number | null }>({ categoryId: null });
   const [cartCheckoutOpen, setCartCheckoutOpen] = useState(false);
+  const [companyPickerRoleFilter, setCompanyPickerRoleFilter] = useState<"buyer" | "supplier" | null>(null);
   const [tourTargetFound, setTourTargetFound] = useState(false);
   const [homeCategoryTouched, setHomeCategoryTouched] = useState(false);
   const [aiOnboardingAnswered, setAiOnboardingAnswered] = useState(false);
@@ -58,6 +51,7 @@ export default function App() {
   const [splashAnimationDone, setSplashAnimationDone] = useState(() => !hasAccessToken());
   const resetUiAfterSessionExpiry = useCallback(() => {
     setCompanyPickerOpen(false);
+    setCompanyPickerRoleFilter(null);
     setDrawerOpen(false);
     setDrawerScreen(null);
     setOrdersOpen(false);
@@ -72,7 +66,6 @@ export default function App() {
     notificationCount,
     companyId,
     appRole,
-    setAppRole,
     setProfile,
     setProfileNonce,
     setNotificationCount,
@@ -81,7 +74,6 @@ export default function App() {
     handleAuthSuccess,
     handleLogout,
     handleLogoutAll,
-    handleSwitchCompany,
   } = useAppSession({ onSessionExpiredUiReset: resetUiAfterSessionExpiry });
 
   useEffect(() => {
@@ -98,18 +90,7 @@ export default function App() {
   const cartItems = useMemo(() => cart.items, [cart.items]);
   const currentCompany = profile?.companies?.find((c) => c.company_id === companyId) ?? null;
   const currentCompanyName = currentCompany?.name ?? null;
-  const reputation = useMemo(() => {
-    const seedSource = `${profile?.email ?? ""}|${profile?.role ?? ""}|${currentCompanyName ?? ""}`;
-    const seed = hashSeed(seedSource || "usc-user");
-    const rating = Math.min(4.9, 4.3 + (seed % 61) / 100);
-    const reviews = 85 + (seed % 540);
-    const completedOrders = 40 + (seed % 320);
-    return {
-      rating: Number(rating.toFixed(1)),
-      reviews,
-      completedOrders,
-    };
-  }, [profile?.email, profile?.role, currentCompanyName]);
+  const currentCompletedOrders = typeof currentCompany?.completed_orders === "number" ? currentCompany.completed_orders : 0;
 
   const keepSplashVisible = authed && !splashAnimationDone;
   const onboardingContext = useMemo(() => {
@@ -184,11 +165,59 @@ export default function App() {
 
   const openDrawer = () => setDrawerOpen(true);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
-  const handleOpenCompanyPicker = () => {
-    handleSwitchCompany();
-    setDrawerOpen(false);
+  const closeCompanyPicker = useCallback(() => {
+    setCompanyPickerOpen(false);
+    setCompanyPickerRoleFilter(null);
+  }, []);
+  const persistCompanySelection = useCallback(
+    (id: number) => {
+      if (!profile) return;
+      const selected = profile.companies?.find((company) => company.company_id === id) ?? null;
+      setCompanyId(id);
+      localStorage.setItem("usc_company_id", String(id));
+      if (selected?.name) localStorage.setItem("usc_company_name", selected.name);
+      else localStorage.removeItem("usc_company_name");
+    },
+    [profile, setCompanyId]
+  );
+  const openCompanyPicker = useCallback((roleFilter: "buyer" | "supplier" | null = null) => {
+    setCompanyPickerRoleFilter(roleFilter);
     setCompanyPickerOpen(true);
-  };
+  }, []);
+  const handleOpenCompanyPicker = useCallback(() => {
+    setDrawerOpen(false);
+    openCompanyPicker(null);
+  }, [openCompanyPicker]);
+  const requestRoleSwitch = useCallback(
+    (nextRole: "buyer" | "supplier") => {
+      if (!profile) return;
+      const expectedType = nextRole === "supplier" ? "SUPPLIER" : "BUYER";
+      const currentType = String(currentCompany?.company_type || "").toUpperCase();
+      if (currentType === expectedType) {
+        closeDrawer();
+        return;
+      }
+      const candidates = (profile.companies || []).filter(
+        (company) => String(company.company_type || "").toUpperCase() === expectedType
+      );
+      if (candidates.length === 0) {
+        toast.show(
+          nextRole === "supplier" ? "Для этого аккаунта нет компаний поставщика." : "Для этого аккаунта нет компаний покупателя.",
+          "error"
+        );
+        return;
+      }
+      if (candidates.length === 1) {
+        persistCompanySelection(candidates[0].company_id);
+        closeCompanyPicker();
+        closeDrawer();
+        return;
+      }
+      closeDrawer();
+      openCompanyPicker(nextRole);
+    },
+    [closeCompanyPicker, closeDrawer, currentCompany?.company_type, openCompanyPicker, persistCompanySelection, profile, toast]
+  );
 
   const goTab = useCallback((tab: TabKey) => {
     setOrdersOpen(false);
@@ -348,14 +377,12 @@ export default function App() {
         onGo={openDrawerScreen}
         onLogout={handleLogout}
         onLogoutAll={handleLogoutAll}
-          onSwitchCompany={handleOpenCompanyPicker}
+        onSwitchCompany={handleOpenCompanyPicker}
         companyName={currentCompanyName}
         role={appRole}
-        onRoleChange={setAppRole}
+        onRoleChange={requestRoleSwitch}
         notificationCount={notificationCount}
-        ratingValue={reputation.rating}
-        reviewCount={reputation.reviews}
-        completedOrders={reputation.completedOrders}
+        completedOrders={currentCompletedOrders}
       />
 
       <main className={screensClassName}>
@@ -365,7 +392,7 @@ export default function App() {
           onBurger={openDrawer}
           onAdd={addToCart}
           showCompanyBanner={!!needsCompany}
-          onPickCompany={() => setCompanyPickerOpen(true)}
+          onPickCompany={() => openCompanyPicker(null)}
           onCategoryChange={(nextCategory) => {
             if (nextCategory !== "meat") setHomeCategoryTouched(true);
           }}
@@ -388,7 +415,7 @@ export default function App() {
           role={appRole}
           companyId={companyId}
           showCompanyBanner={!!needsCompany}
-          onPickCompany={() => setCompanyPickerOpen(true)}
+          onPickCompany={() => openCompanyPicker(null)}
         />
 
         <AIChatScreen
@@ -399,7 +426,7 @@ export default function App() {
           role={appRole}
           companyId={companyId}
           showCompanyBanner={!!needsCompany}
-          onPickCompany={() => setCompanyPickerOpen(true)}
+          onPickCompany={() => openCompanyPicker(null)}
           onboardingPromptEnabled={onboardingAiPromptMode}
           onOnboardingAnswerReady={setAiOnboardingAnswered}
         />
@@ -426,13 +453,12 @@ export default function App() {
           cartCount={cart.count}
           onBurger={openDrawer}
           profile={profile}
+          role={appRole}
           companyName={currentCompanyName}
           onSwitchCompany={handleOpenCompanyPicker}
           showCompanyBanner={!!needsCompany}
-          onPickCompany={() => setCompanyPickerOpen(true)}
-          ratingValue={reputation.rating}
-          reviewCount={reputation.reviews}
-          completedOrders={reputation.completedOrders}
+          onPickCompany={() => openCompanyPicker(null)}
+          completedOrders={currentCompletedOrders}
         />
 
         <SupplierScreen
@@ -473,7 +499,7 @@ export default function App() {
           role={appRole}
           companyId={companyId}
           showCompanyBanner={!!needsCompany}
-          onPickCompany={() => setCompanyPickerOpen(true)}
+          onPickCompany={() => openCompanyPicker(null)}
           onNotify={toast.show}
         />
 
@@ -551,15 +577,13 @@ export default function App() {
           <CompanyPickerScreen
             profile={profile}
             selectedId={companyId}
+            roleFilter={companyPickerRoleFilter}
             onSelect={(id) => {
-              const selected = profile.companies?.find((c) => c.company_id === id);
-              setCompanyId(id);
-              localStorage.setItem("usc_company_id", String(id));
-              if (selected) localStorage.setItem("usc_company_name", selected.name || "");
-              setCompanyPickerOpen(false);
+              persistCompanySelection(id);
+              closeCompanyPicker();
             }}
             onLogout={handleLogout}
-            onClose={() => setCompanyPickerOpen(false)}
+            onClose={closeCompanyPicker}
           />
         </div>
       ) : null}

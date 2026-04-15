@@ -67,7 +67,7 @@ export default function HomeScreen({
 
   const categoryId = CATEGORY_TO_ID[category];
   const deferredQuery = useDeferredValue(query.trim());
-  const { products, loading } = useProducts(categoryId, deferredQuery);
+  const { products, loading, refreshing } = useProducts(categoryId, deferredQuery);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -164,7 +164,7 @@ export default function HomeScreen({
           ) : (
             filteredProducts.map((p, idx) => (
               <ProductCard
-                key={`${p.id}-${idx}`}
+                key={p.id}
                 product={p}
                 onAdd={() => onAdd(p)}
                 onOpen={() => setSelectedProduct(p)}
@@ -173,6 +173,7 @@ export default function HomeScreen({
             ))
           )}
         </div>
+        {refreshing && filteredProducts.length > 0 ? <div className="search-empty">Обновляем список товаров…</div> : null}
       </div>
 
       <ProductDetailsSheet

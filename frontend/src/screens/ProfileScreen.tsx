@@ -20,36 +20,33 @@ export default function ProfileScreen({
   cartCount,
   onBurger,
   profile,
+  role,
   companyName,
   onSwitchCompany,
   showCompanyBanner = false,
   onPickCompany,
-  ratingValue = 4.8,
-  reviewCount = 128,
-  completedOrders = 96,
+  completedOrders = 0,
 }: {
   active: boolean;
   cartCount: number;
   onBurger: () => void;
   profile: MeProfile | null;
+  role?: string | null;
   companyName?: string | null;
   onSwitchCompany: () => void;
   showCompanyBanner?: boolean;
   onPickCompany?: () => void;
-  ratingValue?: number;
-  reviewCount?: number;
   completedOrders?: number;
 }) {
   const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim();
   const displayName = fullName || profile?.email || "USC user";
   const displayEmail = profile?.email || "—";
   const displayPhone = profile?.phone || "—";
-  const roleText = roleLabel(profile?.role);
+  const roleText = roleLabel(role ?? profile?.role);
   const companies = profile?.companies ?? [];
   const companiesCount = companies.length;
   const courierEnabled = profile?.is_courier_enabled ? "Да" : "Нет";
   const currentCompany = companyName || "Не выбрана";
-  const safeRating = Math.max(0, Math.min(5, ratingValue));
 
   return (
     <section id="screen-profile" className={`screen ${active ? "active" : ""}`}>
@@ -81,23 +78,7 @@ export default function ProfileScreen({
             <div className="profilev2-name">{displayName}</div>
             <div className="profilev2-email">{displayEmail}</div>
             <div className="profilev2-role-chip">{roleText}</div>
-            <div className="profilev2-rating-row">
-              <div className="profilev2-stars" aria-hidden="true">
-                {Array.from({ length: 5 }, (_, idx) => {
-                  const fill = Math.max(0, Math.min(1, safeRating - idx));
-                  const steppedFillPct = Math.round(fill * 5) * 20;
-                  return (
-                    <span key={idx} className="profilev2-star-slot">
-                      <img className="profilev2-star-base" src="/media/star_none.svg" alt="" />
-                      <span className="profilev2-star-fill" style={{ width: `${steppedFillPct}%` }}>
-                        <img className="profilev2-star-top" src="/media/star.svg" alt="" />
-                      </span>
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="profilev2-rating-text">{`${safeRating.toFixed(1)} · ${reviewCount} отзывов`}</div>
-            </div>
+            <div className="profilev2-rating-text">Роль и активная компания определяют текущий рабочий режим.</div>
           </div>
         </div>
 
@@ -114,12 +95,12 @@ export default function ProfileScreen({
 
         <div className="profilev2-stats">
           <div className="profilev2-stat">
-            <div className="profilev2-stat-value">{safeRating.toFixed(1)}</div>
-            <div className="profilev2-stat-label">Рейтинг</div>
+            <div className="profilev2-stat-value">{roleText}</div>
+            <div className="profilev2-stat-label">Режим</div>
           </div>
           <div className="profilev2-stat">
-            <div className="profilev2-stat-value">{reviewCount}</div>
-            <div className="profilev2-stat-label">Отзывы</div>
+            <div className="profilev2-stat-value">{courierEnabled}</div>
+            <div className="profilev2-stat-label">Курьер</div>
           </div>
           <div className="profilev2-stat">
             <div className="profilev2-stat-value">{companiesCount}</div>
@@ -127,7 +108,7 @@ export default function ProfileScreen({
           </div>
           <div className="profilev2-stat">
             <div className="profilev2-stat-value">{completedOrders}</div>
-            <div className="profilev2-stat-label">Заказов</div>
+            <div className="profilev2-stat-label">Завершено</div>
           </div>
         </div>
 

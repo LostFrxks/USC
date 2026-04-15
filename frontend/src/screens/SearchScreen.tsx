@@ -49,7 +49,7 @@ export default function SearchScreen({
     if (!active) setSelectedProduct(null);
   }, [active]);
 
-  const { products, loading } = useProducts(categoryId, debounced);
+  const { products, loading, refreshing } = useProducts(categoryId, debounced);
   const filteredProducts = useMemo(() => products ?? [], [products]);
 
   useEffect(() => {
@@ -131,6 +131,7 @@ export default function SearchScreen({
               ))
             )}
           </div>
+          {refreshing && filteredProducts.length > 0 ? <div className="search-empty">Обновляем результаты…</div> : null}
 
           {supOk && !supLoading && suppliers.length > 0 && (
             <ul className="search-list">

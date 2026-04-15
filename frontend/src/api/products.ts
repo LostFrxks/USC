@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Product } from "../types";
+import type { Category, Product } from "../types";
 
 type ApiPage<T> = {
   count: number;
@@ -116,6 +116,24 @@ const PRODUCTS_TTL_MS = 60 * 1000;
 const productsCache = new Map<string, { data: Product[]; expiresAt: number }>();
 const productsInFlight = new Map<string, Promise<Product[]>>();
 
+const CATEGORY_NAME_TO_KEY: Record<string, Category> = {
+  meat: "meat",
+  milk: "milk",
+  fish: "fish",
+  bread: "bread",
+  fruit: "fruit",
+  grain: "grain",
+};
+
+const CATEGORY_ID_TO_KEY: Record<number, Category> = {
+  1: "meat",
+  2: "milk",
+  3: "fish",
+  4: "bread",
+  5: "fruit",
+  6: "grain",
+};
+
 function pickImage(p: ProductApi, categoryId: number | null): string {
   const key = String(p.category_name || "").toLowerCase();
   const byCategory: Record<string, string[]> = {
@@ -148,6 +166,10 @@ function normalize(p: ProductApi): Product {
   const rawCategory = p.category_id ?? p.category;
   const supplierCompanyId = Number(rawSupplierCompany);
   const categoryId = rawCategory != null ? Number(rawCategory) : null;
+  const categoryKey =
+    CATEGORY_NAME_TO_KEY[String(p.category_name || "").toLowerCase()] ??
+    (categoryId != null ? CATEGORY_ID_TO_KEY[categoryId] : undefined) ??
+    "meat";
 
   return {
     id: String(p.id),
@@ -167,10 +189,8 @@ function normalize(p: ProductApi): Product {
     lead_time_days: p.lead_time_days == null ? null : Number.isFinite(Number(p.lead_time_days)) ? Number(p.lead_time_days) : null,
     seller: p.supplier_name ?? `Supplier #${rawSupplierCompany ?? "?"}`,
     price: Number(p.price ?? 0),
-    rating: "4.8",
-    reviews: 10,
     image: pickImage(p, categoryId),
-    category: "meat",
+    category: categoryKey,
     supplier_company_id: Number.isFinite(supplierCompanyId) ? supplierCompanyId : undefined,
     category_id: categoryId != null && Number.isFinite(categoryId) ? categoryId : null,
   };

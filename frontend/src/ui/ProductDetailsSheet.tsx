@@ -57,6 +57,9 @@ export default function ProductDetailsSheet({
     typeof product.price === "number" && product.price > 0
       ? `${Math.round(product.price).toLocaleString("ru-RU")} сом`
       : "по запросу";
+  const ratingText = product.rating ? String(product.rating).trim() : "";
+  const reviewsCount = typeof product.reviews === "number" && Number.isFinite(product.reviews) ? product.reviews : null;
+  const showRating = Boolean(ratingText) || reviewsCount != null;
 
   return createPortal(
     <div className="product-sheet-overlay" onClick={onClose}>
@@ -108,7 +111,14 @@ export default function ProductDetailsSheet({
           ) : null}
 
           <div className="product-sheet-footer">
-            <div className="product-sheet-rating">★ {product.rating} • {product.reviews} оценок</div>
+            {showRating ? (
+              <div className="product-sheet-rating">
+                {ratingText ? `★ ${ratingText}` : ""}
+                {reviewsCount != null ? `${ratingText ? " • " : ""}${reviewsCount} оценок` : ""}
+              </div>
+            ) : (
+              <span />
+            )}
             <button
               type="button"
               className="primary-button product-sheet-add"

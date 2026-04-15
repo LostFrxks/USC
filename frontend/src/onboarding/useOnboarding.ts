@@ -32,7 +32,7 @@ export function useOnboarding({
   const safeStepsCount = Math.max(1, Math.floor(stepsCount || 1));
   const contextKey = useMemo(() => {
     if (!context) return null;
-    return `${context.userId}.${context.companyId}.${String(context.role || "").toLowerCase()}`;
+    return `${context.userId}.${String(context.role || "").toLowerCase()}`;
   }, [context]);
 
   useEffect(() => {
